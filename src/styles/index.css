@@ -1,0 +1,78 @@
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: "Tajawal", "Nunito", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Tajawal", "Quicksand", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Latin / brand display fragments opt-in via .font-display */
+  .font-display {
+    font-family: "Quicksand", "Tajawal", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* §3.3 Surface ambient background — soft blue glow top-start + yellow glow top-end */
+  .surface-bg {
+    background-color: #f9fdff;
+    background-image:
+      radial-gradient(60rem 40rem at 0% -10%, oklch(0.62 0.16 240 / 0.1), transparent 60%),
+      radial-gradient(55rem 38rem at 100% -8%, oklch(0.86 0.16 90 / 0.12), transparent 60%);
+    background-attachment: fixed;
+  }
+}
+
+/* RTL: keep numbers/latin readable; mirror handled by dir="rtl" */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Custom scrollbar (subtle) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.85 0.02 240);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Hide scrollbar utility for horizontal chip rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

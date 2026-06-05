@@ -1,0 +1,55 @@
+import type { AppNotification } from "./types";
+import { DOCTOR_ID } from "./seed";
+
+export const notifications: AppNotification[] = [
+  {
+    id: "n1",
+    userId: DOCTOR_ID,
+    type: "alert",
+    message: "وصلت نتيجة مخبرية خارجية جديدة (بزل نقي) للمريضة جنى الخطيب.",
+    relatedPatientFileNo: "B-2058",
+    timestamp: "2026-06-02T06:05:00",
+    isRead: false,
+    link: "/patients/B-2058/results",
+  },
+  {
+    id: "n2",
+    userId: DOCTOR_ID,
+    type: "alert",
+    message: "نتيجة رنين مغناطيسي خارجية جاهزة للمريض حمزة الزين.",
+    relatedPatientFileNo: "B-3025",
+    timestamp: "2026-06-02T05:35:00",
+    isRead: false,
+    link: "/patients/B-3025/results",
+  },
+  {
+    id: "n3",
+    userId: DOCTOR_ID,
+    type: "reminder",
+    message: "جرعة بانتظار الإقرار للمريضة ريتا العمر في القسم الداخلي.",
+    relatedPatientFileNo: "B-3012",
+    timestamp: "2026-06-02T07:00:00",
+    isRead: false,
+    link: "/patients/B-3012/dose",
+  },
+  {
+    id: "n4",
+    userId: DOCTOR_ID,
+    type: "info",
+    message: "تم رفض طلب البزل القطني للمريض عمر الحموي (العينة غير كافية).",
+    relatedPatientFileNo: "B-3050",
+    timestamp: "2026-06-02T09:20:00",
+    isRead: true,
+    link: "/patients/B-3050/results",
+  },
+  {
+    id: "n5",
+    userId: DOCTOR_ID,
+    type: "reminder",
+    message: "مسودة توثيق غير مكتملة للمريضة جنى الخطيب.",
+    relatedPatientFileNo: "B-2058",
+    timestamp: "2026-06-01T14:30:00",
+    isRead: true,
+    link: "/patients/B-2058/document",
+  },
+];
