@@ -3,6 +3,7 @@ export { patients, getPatient } from "./patients";
 export { templates } from "./templates";
 export { laboratories, TEST_TYPES, testLabel } from "./laboratories";
 export { notifications } from "./notifications";
+export { consultRequests } from "./consultRequests";
 export {
   DOCTOR_ID,
   doctor,

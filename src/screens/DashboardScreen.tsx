@@ -7,6 +7,7 @@ import {
   FlaskConical,
   Globe,
   Search,
+  Stethoscope,
   Syringe,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -77,13 +78,13 @@ export function DashboardScreen() {
       <section>
         <h2 className="mb-3 text-lg font-bold text-foreground">{t.dashboard.priorityTitle}</h2>
         {loading ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {Array.from({ length: 5 }).map((_, i) => (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-28 rounded-2xl" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <CountCard
               label={t.dashboard.resultsToReview}
               count={counts.resultsToReview}
@@ -119,6 +120,13 @@ export function DashboardScreen() {
               tone="secondary"
               icon={<Globe />}
               onClick={() => navigate("/labs?filter=external-new")}
+            />
+            <CountCard
+              label={t.dashboard.pendingConsults}
+              count={counts.pendingConsults}
+              tone="accent"
+              icon={<Stethoscope />}
+              onClick={() => navigate("/consult-requests")}
             />
           </div>
         )}

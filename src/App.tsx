@@ -12,6 +12,7 @@ import { DocumentationScreen } from "@/screens/DocumentationScreen";
 import { LabRequestScreen } from "@/screens/LabRequestScreen";
 import { ResultsScreen } from "@/screens/ResultsScreen";
 import { DoseApprovalScreen } from "@/screens/DoseApprovalScreen";
+import { ConsultRequestsScreen } from "@/screens/ConsultRequestsScreen";
 import { TreatmentPlanScreen } from "@/screens/TreatmentPlanScreen";
 import { DischargeScreen } from "@/screens/DischargeScreen";
 import { LabsScreen } from "@/screens/LabsScreen";
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/patients/:fileNo/plan" element={<TreatmentPlanScreen />} />
           <Route path="/patients/:fileNo/discharge" element={<DischargeScreen />} />
           <Route path="/labs" element={<LabsScreen />} />
+          <Route path="/consult-requests" element={<ConsultRequestsScreen />} />
           <Route path="/notifications" element={<NotificationsScreen />} />
           <Route path="/profile" element={<ProfileScreen />} />
         </Route>

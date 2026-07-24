@@ -7,11 +7,13 @@ export interface DashboardCounts {
   incompleteDrafts: number;
   pendingDischarge: number;
   newExternalResults: number;
+  pendingConsults: number;
 }
 
 /** Live dashboard priority-row counts, scoped to the active department. */
 export function useDashboardCounts(): DashboardCounts {
-  const { patients, labRequests, documentations, pendingDischargeFileNos, department } = useAppStore();
+  const { patients, labRequests, documentations, pendingDischargeFileNos, consultRequests, department } =
+    useAppStore();
   const inDept = (fileNo: string) =>
     patients.find((p) => p.fileNoBasma === fileNo)?.department === department;
 
@@ -33,7 +35,18 @@ export function useDashboardCounts(): DashboardCounts {
     (l) => l.isExternalNew && !l.reviewed && inDept(l.patientFileNo)
   ).length;
 
-  return { resultsToReview, dosesToApprove, incompleteDrafts, pendingDischarge, newExternalResults };
+  const pendingConsults = consultRequests.filter(
+    (c) => c.status === "pending" && inDept(c.patientFileNo)
+  ).length;
+
+  return {
+    resultsToReview,
+    dosesToApprove,
+    incompleteDrafts,
+    pendingDischarge,
+    newExternalResults,
+    pendingConsults,
+  };
 }
 
 /** Patients in the active department (today's queue), ordered by token. */

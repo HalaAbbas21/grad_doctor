@@ -5,16 +5,24 @@ import {
   Clock,
   FlaskConical,
   HeartPulse,
+  Hourglass,
   Syringe,
 } from "lucide-react";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import {
+  consultStatusLabel,
   labStatusLabel,
   lifeStatusLabel,
   queueStatusLabel,
   stageStatusLabel,
 } from "@/i18n/ar";
-import type { LabRequestStatus, LifeStatus, PatientQueueStatus, StageStatus } from "@/mock/types";
+import type {
+  ConsultRequestStatus,
+  LabRequestStatus,
+  LifeStatus,
+  PatientQueueStatus,
+  StageStatus,
+} from "@/mock/types";
 
 /** Queue status → token variant + icon (color + icon + label, never color alone). */
 const QUEUE_MAP: Record<PatientQueueStatus, { variant: BadgeProps["variant"]; icon: React.ReactNode }> = {
@@ -73,4 +81,20 @@ const STAGE_MAP: Record<StageStatus, BadgeProps["variant"]> = {
 
 export function StageStatusBadge({ status }: { status: StageStatus }) {
   return <Badge variant={STAGE_MAP[status]}>{stageStatusLabel[status]}</Badge>;
+}
+
+const CONSULT_STATUS_MAP: Record<ConsultRequestStatus, { variant: BadgeProps["variant"]; icon: React.ReactNode }> = {
+  pending: { variant: "warning", icon: <Hourglass /> },
+  coordinated: { variant: "secondary", icon: <CheckCircle2 /> },
+};
+
+/** Renders any status the backend returns — falls back to a neutral, muted badge for values outside the known union. */
+export function ConsultStatusBadge({ status }: { status: ConsultRequestStatus }) {
+  const m = CONSULT_STATUS_MAP[status] ?? { variant: "muted" as const, icon: null };
+  return (
+    <Badge variant={m.variant}>
+      {m.icon}
+      {consultStatusLabel[status] ?? status}
+    </Badge>
+  );
 }

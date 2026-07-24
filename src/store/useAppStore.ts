@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   appointments as seedAppointments,
   clinicalNotes as seedNotes,
+  consultRequests as seedConsultRequests,
   dischargeReports as seedDischarge,
   documentations as seedDocs,
   doctor as seedDoctor,
@@ -16,6 +17,7 @@ import type {
   Appointment,
   AppNotification,
   ClinicalNote,
+  ConsultRequest,
   Department,
   DischargeReport,
   DiseaseDocumentation,
@@ -43,6 +45,7 @@ interface AppState {
   notes: ClinicalNote[];
   notifications: AppNotification[];
   pendingDischargeFileNos: string[];
+  consultRequests: ConsultRequest[];
 
   // Dev toggle to demonstrate error states
   simulateDownloadError: boolean;
@@ -62,6 +65,7 @@ interface AppState {
   approveDose: (fileNo: string) => void;
   addNote: (note: ClinicalNote) => void;
   setPatientDestination: (fileNo: string, dept: Department) => void;
+  coordinateConsultRequest: (id: string) => void;
 
   // Actions — notifications
   markNotificationRead: (id: string) => void;
@@ -83,6 +87,7 @@ export const useAppStore = create<AppState>((set) => ({
   notes: seedNotes,
   notifications: seedNotifications,
   pendingDischargeFileNos: pendingDischargeFileNos,
+  consultRequests: seedConsultRequests,
 
   simulateDownloadError: false,
 
@@ -139,6 +144,20 @@ export const useAppStore = create<AppState>((set) => ({
   setPatientDestination: (fileNo, dept) =>
     set((s) => ({
       patients: s.patients.map((p) => (p.fileNoBasma === fileNo ? { ...p, department: dept } : p)),
+    })),
+
+  coordinateConsultRequest: (id) =>
+    set((s) => ({
+      consultRequests: s.consultRequests.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status: "coordinated",
+              coordinatedAt: new Date().toISOString(),
+              coordinatedBy: `د. ${s.doctor.firstName} ${s.doctor.lastName}`,
+            }
+          : c
+      ),
     })),
 
   markNotificationRead: (id) =>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  Check,
   ClipboardEdit,
   FileCheck2,
   FilePlus2,
@@ -8,6 +9,7 @@ import {
   MapPinned,
   MessageSquarePlus,
   Send,
+  Stethoscope,
   Syringe,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +21,9 @@ import { EmptyState } from "@/components/ui/states";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { PatientContextBar } from "@/components/PatientContextBar";
 import { StageTimeline } from "@/components/StageTimeline";
-import { LabStatusBadge, StageStatusBadge } from "@/components/StatusBadge";
+import { ConsultStatusBadge, LabStatusBadge, StageStatusBadge } from "@/components/StatusBadge";
+import { ConsultTypeBadge } from "@/components/consult-type-badge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAppStore } from "@/store/useAppStore";
 import { useToast } from "@/components/ui/toast";
 import { computeAge, formatDate, formatDateTime } from "@/lib/utils";
@@ -27,6 +31,7 @@ import { testLabel } from "@/mock/laboratories";
 import {
   caregiverEducationLabel,
   caregiverLabel,
+  consultTypeLabel,
   departmentLabel,
   genderLabel,
   nationalityLabel,
@@ -34,6 +39,7 @@ import {
   t,
 } from "@/i18n/ar";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
+import type { ConsultRequest } from "@/mock/types";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -55,12 +61,15 @@ export function PatientRecordScreen() {
   const notes = useAppStore((s) => s.notes);
   const dischargeReports = useAppStore((s) => s.dischargeReports);
   const appointments = useAppStore((s) => s.appointments);
+  const consultRequests = useAppStore((s) => s.consultRequests);
   const addNote = useAppStore((s) => s.addNote);
   const setPatientDestination = useAppStore((s) => s.setPatientDestination);
+  const coordinateConsultRequest = useAppStore((s) => s.coordinateConsultRequest);
   const doctor = useAppStore((s) => s.doctor);
 
   const patient = patients.find((p) => p.fileNoBasma === fileNo);
   const [noteText, setNoteText] = useState("");
+  const [consultTarget, setConsultTarget] = useState<ConsultRequest | null>(null);
 
   if (!patient) {
     return (
@@ -81,6 +90,14 @@ export function PatientRecordScreen() {
   const patientNotes = notes.filter((n) => n.patientFileNo === fileNo);
   const discharges = dischargeReports.filter((d) => d.patientFileNo === fileNo);
   const appts = appointments.filter((a) => a.patientFileNo === fileNo);
+  const consults = consultRequests.filter((c) => c.patientFileNo === fileNo);
+
+  const confirmCoordinate = () => {
+    if (!consultTarget) return;
+    coordinateConsultRequest(consultTarget.id);
+    toast.success(t.consult.coordinated, consultTypeLabel[consultTarget.consultationType]);
+    setConsultTarget(null);
+  };
 
   const submitNote = () => {
     if (!noteText.trim()) return;
@@ -133,6 +150,7 @@ export function PatientRecordScreen() {
           <TabsTrigger value="documentation">{t.patient.documentation}</TabsTrigger>
           <TabsTrigger value="plan">{t.patient.plan}</TabsTrigger>
           <TabsTrigger value="labs">{t.patient.labs}</TabsTrigger>
+          <TabsTrigger value="consultRequests">{t.patient.consultRequests}</TabsTrigger>
           <TabsTrigger value="vitals">{t.patient.vitals}</TabsTrigger>
           <TabsTrigger value="notes">{t.patient.notes}</TabsTrigger>
           <TabsTrigger value="discharge">{t.patient.discharge}</TabsTrigger>
@@ -351,6 +369,63 @@ export function PatientRecordScreen() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* ── Consult requests ── */}
+        <TabsContent value="consultRequests">
+          {(patient.consultationNeeds?.length ?? 0) > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-bold text-muted-foreground">{t.patient.consultationNeeds}:</span>
+              {patient.consultationNeeds!.map((ct) => (
+                <ConsultTypeBadge key={ct} type={ct} />
+              ))}
+            </div>
+          )}
+          {consults.length === 0 ? (
+            <EmptyState tone="success" title={t.consult.empty} />
+          ) : (
+            <div className="space-y-3">
+              {consults.map((c) => (
+                <Card key={c.id} className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ConsultTypeBadge type={c.consultationType} />
+                        <ConsultStatusBadge status={c.status} />
+                      </div>
+                      {c.notes && <p className="mt-1.5 text-sm text-muted-foreground">{c.notes}</p>}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t.consult.requestDate}: {formatDate(c.createdAt)}
+                      </p>
+                    </div>
+                    {c.status === "pending" && (
+                      <Button size="sm" onClick={() => setConsultTarget(c)}>
+                        <Check className="size-4" /> {t.consult.coordinate}
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+          <ConfirmDialog
+            open={consultTarget != null}
+            onOpenChange={(open) => !open && setConsultTarget(null)}
+            title={t.consult.coordinate}
+            description={consultTarget ? `${patient.firstName} ${patient.familyName} · ${consultTarget.patientFileNo}` : undefined}
+            confirmLabel={t.consult.coordinate}
+            onConfirm={confirmCoordinate}
+          >
+            {consultTarget && (
+              <div className="rounded-xl bg-muted/60 p-4 text-sm">
+                <p className="flex items-center gap-2 font-bold">
+                  <Stethoscope className="size-4 text-primary" />
+                  {consultTypeLabel[consultTarget.consultationType]}
+                </p>
+                <p className="mt-1 text-muted-foreground">{t.consult.coordinateConfirm}</p>
+              </div>
+            )}
+          </ConfirmDialog>
         </TabsContent>
 
         {/* ── Vitals ── */}

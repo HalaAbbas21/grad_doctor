@@ -64,6 +64,7 @@ export const patients: Patient[] = [
     criticalFlags: ["حساسية من البنسلين"],
     nationalIdPatient: "04210034512",
     nationalIdFather: "04210011223",
+    consultationNeeds: ["cardiac"],
   }),
   makePatient({
     fileNoBasma: "B-1077",
@@ -96,6 +97,7 @@ export const patients: Patient[] = [
     queueStatus: "in-treatment",
     tokenNumber: 3,
     waitingSince: "2026-06-02T09:05:00",
+    consultationNeeds: ["ent"],
   }),
   makePatient({
     fileNoBasma: "B-1101",
@@ -113,6 +115,7 @@ export const patients: Patient[] = [
     queueStatus: "awaiting-dose-approval",
     tokenNumber: 4,
     waitingSince: "2026-06-02T09:25:00",
+    consultationNeeds: ["surgery"],
   }),
   makePatient({
     fileNoBasma: "B-1115",
@@ -198,6 +201,7 @@ export const patients: Patient[] = [
     criticalFlags: ["حمى عدلية", "هبوط صفيحات شديد"],
     tokenNumber: 4,
     waitingSince: "2026-06-02T07:50:00",
+    consultationNeeds: ["ophthalmic"],
   }),
 
   // ── Inpatient (القسم الداخلي) ──────────────────────────────────────
@@ -233,6 +237,7 @@ export const patients: Patient[] = [
     queueStatus: "result-ready",
     tokenNumber: 2,
     waitingSince: "2026-06-02T08:15:00",
+    consultationNeeds: ["surgery"],
   }),
   makePatient({
     fileNoBasma: "B-3038",

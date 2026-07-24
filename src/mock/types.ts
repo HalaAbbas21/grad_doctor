@@ -50,6 +50,10 @@ export type AppointmentStatus = "scheduled" | "checked-in" | "done" | "missed";
 
 export type NotificationType = "alert" | "info" | "reminder"; // تنبيه / معلومة / تذكير
 
+export type ConsultationType = "cardiac" | "neurological" | "ophthalmic" | "ent" | "surgery" | "other";
+
+export type ConsultRequestStatus = "pending" | "coordinated";
+
 /** Patient-status badge shown in queues/lists (§6.3). */
 export type PatientQueueStatus =
   | "awaiting-lab" // بانتظار التحليل
@@ -136,6 +140,8 @@ export interface Patient {
   criticalFlags: string[];
   department: Department;
   registrationDate: string;
+  /** Consultation specialties this patient's case has been flagged for. */
+  consultationNeeds?: ConsultationType[];
 
   // Queue/dashboard helpers (mock-only derived state)
   queueStatus: PatientQueueStatus;
@@ -232,6 +238,26 @@ export interface LabTestRequest {
   /** Links this lab to a pending dose approval. */
   tiedToDose?: boolean;
   isExternalNew?: boolean; // newly arrived external result (dashboard count)
+}
+
+// ─── Consult requests ───────────────────────────────────────────────────────
+// Reception creates these (POST); the doctor only reads and coordinates them
+// (GET /consult-requests, PATCH /consult-requests/{id}/coordinate) — no
+// create/delete affordance belongs in this app.
+
+export interface ConsultRequest {
+  id: string;
+  patientFileNo: string;
+  consultationType: ConsultationType;
+  notes?: string;
+  // TODO(api-contract): only `status=pending` is confirmed from the collection
+  // endpoint; "coordinated" is inferred from the /coordinate action's purpose.
+  // The UI (see ConsultStatusBadge) renders any other value as a neutral
+  // passthrough rather than assuming this union is exhaustive.
+  status: ConsultRequestStatus;
+  createdAt: string;
+  coordinatedAt?: string;
+  coordinatedBy?: string;
 }
 
 // ─── Treatment plan ────────────────────────────────────────────────────────────

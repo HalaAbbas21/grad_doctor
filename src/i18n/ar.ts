@@ -4,6 +4,8 @@ import type {
   AppointmentType,
   Caregiver,
   CaregiverEducation,
+  ConsultationType,
+  ConsultRequestStatus,
   Gender,
   LabPriority,
   LabRequestStatus,
@@ -110,6 +112,7 @@ export const t = {
     incompleteDrafts: "مسودات غير مكتملة",
     pendingDischarge: "تقارير تخريج معلّقة",
     newExternalResults: "نتائج جديدة من مخابر خارجية",
+    pendingConsults: "طلبات استشارة بانتظار التنسيق",
     todayQueue: "قائمة اليوم",
     todayAppointments: "مواعيد اليوم",
     notificationsFeed: "آخر الإشعارات",
@@ -124,6 +127,8 @@ export const t = {
     documentation: "توثيق المرض",
     plan: "خطة العلاج",
     labs: "التحاليل",
+    consultRequests: "طلبات الاستشارة",
+    consultationNeeds: "احتياجات الاستشارة",
     vitals: "العلامات الحيوية",
     notes: "الملاحظات",
     discharge: "تقارير التخريج",
@@ -161,6 +166,22 @@ export const t = {
     reviewed: "تمت المراجعة",
     notReviewed: "بانتظار المراجعة",
     failDownloadToggle: "محاكاة فشل التنزيل",
+  },
+
+  consult: {
+    title: "طلبات الاستشارة",
+    pendingCount: "استشارات بانتظار التنسيق",
+    type: "نوع الاستشارة",
+    requestNotes: "ملاحظات الطلب",
+    requestDate: "تاريخ الطلب",
+    coordinate: "تنسيق الاستشارة",
+    coordinateConfirm: "سيتم تعليم هذه الاستشارة كمنسّقة.",
+    coordinated: "تم التنسيق",
+    pending: "بانتظار التنسيق",
+    empty: "لا توجد طلبات استشارة بانتظار التنسيق ✅",
+    searchByFileNo: "ابحث برقم الإضبارة…",
+    filterByType: "نوع الاستشارة",
+    filterByStatus: "الحالة",
   },
 
   dose: {
@@ -340,4 +361,18 @@ export const notificationTypeLabel: Record<NotificationType, string> = {
   alert: "تنبيه",
   info: "معلومة",
   reminder: "تذكير",
+};
+
+export const consultTypeLabel: Record<ConsultationType, string> = {
+  cardiac: "قلبية",
+  neurological: "عصبية",
+  ophthalmic: "عينية",
+  ent: "أذنية",
+  surgery: "جراحة",
+  other: "أخرى",
+};
+
+export const consultStatusLabel: Record<ConsultRequestStatus, string> = {
+  pending: "بانتظار التنسيق",
+  coordinated: "تم التنسيق",
 };
