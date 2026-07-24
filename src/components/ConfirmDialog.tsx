@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,13 @@ interface ConfirmDialogProps {
   destructive?: boolean;
   onConfirm: () => void;
   children?: React.ReactNode;
+  /**
+   * When provided, the dialog stops auto-closing on confirm and instead
+   * disables both buttons while true — for writes that must not show an
+   * optimistic "done" state before the (mock) server responds. The caller
+   * is responsible for closing the dialog once the async attempt settles.
+   */
+  loading?: boolean;
 }
 
 /** Confirm step for clinical writes (§4.5). */
@@ -30,9 +38,11 @@ export function ConfirmDialog({
   destructive,
   onConfirm,
   children,
+  loading,
 }: ConfirmDialogProps) {
+  const nonOptimistic = loading !== undefined;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={loading ? undefined : onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -42,14 +52,16 @@ export function ConfirmDialog({
         <DialogFooter>
           <Button
             variant={destructive ? "destructive" : "default"}
+            disabled={loading}
             onClick={() => {
               onConfirm();
-              onOpenChange(false);
+              if (!nonOptimistic) onOpenChange(false);
             }}
           >
+            {loading && <Loader2 className="size-4 animate-spin" />}
             {confirmLabel ?? t.common.confirm}
           </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" disabled={loading} onClick={() => onOpenChange(false)}>
             {t.common.cancel}
           </Button>
         </DialogFooter>

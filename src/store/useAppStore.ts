@@ -4,9 +4,11 @@ import {
   clinicalNotes as seedNotes,
   consultRequests as seedConsultRequests,
   dischargeReports as seedDischarge,
+  doseApprovals as seedDoseApprovals,
   documentations as seedDocs,
   doctor as seedDoctor,
   labRequests as seedLabs,
+  marItems as seedMarItems,
   notifications as seedNotifications,
   patients as seedPatients,
   pendingDischargeFileNos,
@@ -22,7 +24,9 @@ import type {
   DischargeReport,
   DiseaseDocumentation,
   Doctor,
+  DoseApproval,
   LabTestRequest,
+  MarItem,
   Patient,
   TreatmentPlan,
   Vitals,
@@ -46,15 +50,19 @@ interface AppState {
   notifications: AppNotification[];
   pendingDischargeFileNos: string[];
   consultRequests: ConsultRequest[];
+  doseApprovals: DoseApproval[];
+  marItems: MarItem[];
 
-  // Dev toggle to demonstrate error states
+  // Dev toggles to demonstrate error states
   simulateDownloadError: boolean;
+  simulateApprovalError: boolean;
 
   // Actions — session
   login: () => void;
   logout: () => void;
   setDepartment: (d: Department) => void;
   setSimulateDownloadError: (v: boolean) => void;
+  setSimulateApprovalError: (v: boolean) => void;
 
   // Actions — clinical writes
   addLabRequest: (req: LabTestRequest) => void;
@@ -62,7 +70,10 @@ interface AppState {
   upsertDocumentation: (doc: DiseaseDocumentation) => void;
   upsertTreatmentPlan: (plan: TreatmentPlan) => void;
   addDischargeReport: (report: DischargeReport) => void;
-  approveDose: (fileNo: string) => void;
+  /** POST /dose-approvals — creates a "prepared" record; a dose approval cannot exist without a lab request. */
+  createDoseApproval: (patientFileNo: string, labTestRequestId: string) => DoseApproval;
+  /** PATCH /dose-approvals/{id}/approve — mints the MAR item; existence of a MAR item implies approved. */
+  approveDoseApproval: (id: string, input: { approvedDose: string; route: string; medName: string }) => void;
   addNote: (note: ClinicalNote) => void;
   setPatientDestination: (fileNo: string, dept: Department) => void;
   coordinateConsultRequest: (id: string) => void;
@@ -88,14 +99,18 @@ export const useAppStore = create<AppState>((set) => ({
   notifications: seedNotifications,
   pendingDischargeFileNos: pendingDischargeFileNos,
   consultRequests: seedConsultRequests,
+  doseApprovals: seedDoseApprovals,
+  marItems: seedMarItems,
 
   simulateDownloadError: false,
+  simulateApprovalError: false,
 
   login: () => set({ authenticated: true }),
   logout: () => set({ authenticated: false }),
   setDepartment: (d) =>
     set((s) => ({ department: d, doctor: { ...s.doctor, currentDepartment: d } })),
   setSimulateDownloadError: (v) => set({ simulateDownloadError: v }),
+  setSimulateApprovalError: (v) => set({ simulateApprovalError: v }),
 
   addLabRequest: (req) => set((s) => ({ labRequests: [req, ...s.labRequests] })),
 
@@ -132,12 +147,53 @@ export const useAppStore = create<AppState>((set) => ({
       pendingDischargeFileNos: s.pendingDischargeFileNos.filter((f) => f !== report.patientFileNo),
     })),
 
-  approveDose: (fileNo) =>
-    set((s) => ({
-      patients: s.patients.map((p) =>
-        p.fileNoBasma === fileNo ? { ...p, queueStatus: "in-treatment" } : p
-      ),
-    })),
+  createDoseApproval: (patientFileNo, labTestRequestId) => {
+    const record: DoseApproval = {
+      id: `dose-${Date.now()}`,
+      patientFileNo,
+      labTestRequestId,
+      status: "prepared",
+      createdAt: new Date().toISOString(),
+    };
+    set((s) => ({ doseApprovals: [record, ...s.doseApprovals] }));
+    return record;
+  },
+
+  approveDoseApproval: (id, { approvedDose, route, medName }) =>
+    set((s) => {
+      const target = s.doseApprovals.find((d) => d.id === id);
+      if (!target) return {};
+      const marItemId = `mar-${Date.now()}`;
+      const marItem: MarItem = {
+        id: marItemId,
+        patientFileNo: target.patientFileNo,
+        doseApprovalId: id,
+        medName,
+        dose: approvedDose,
+        route,
+        scheduledTime: new Date().toISOString(),
+        administrationStatus: "ready",
+      };
+      return {
+        doseApprovals: s.doseApprovals.map((d) =>
+          d.id === id
+            ? {
+                ...d,
+                status: "approved",
+                approvedDose,
+                route,
+                marItemId,
+                approvedAt: new Date().toISOString(),
+                approvedBy: `د. ${s.doctor.firstName} ${s.doctor.lastName}`,
+              }
+            : d
+        ),
+        marItems: [marItem, ...s.marItems],
+        patients: s.patients.map((p) =>
+          p.fileNoBasma === target.patientFileNo ? { ...p, queueStatus: "in-treatment" } : p
+        ),
+      };
+    }),
 
   addNote: (note) => set((s) => ({ notes: [note, ...s.notes] })),
 

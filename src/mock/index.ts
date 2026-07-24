@@ -4,6 +4,7 @@ export { templates } from "./templates";
 export { laboratories, TEST_TYPES, testLabel } from "./laboratories";
 export { notifications } from "./notifications";
 export { consultRequests } from "./consultRequests";
+export { doseApprovals, marItems } from "./doseApprovals";
 export {
   DOCTOR_ID,
   doctor,

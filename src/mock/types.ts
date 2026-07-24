@@ -1,6 +1,16 @@
 /**
  * Data model for the Basma Doctor app (§7 of the spec).
  * Every entity is fully typed — no `any`. Mock data conforms to these types.
+ *
+ * This file is a shared contract copied across all six Basma apps (Doctor,
+ * Nurse, Reception, Admin, Lab, Guardian). Two changes made here on
+ * 2026-07-24 affect other apps and require follow-up there:
+ *   - `Department`: the value was already `"daycare"` (lowercase) in this
+ *     app; it now also has a single canonical source (src/constants/departments.ts).
+ *   - `MedicationOrder` did not exist in this app to rename — `MarItem` is
+ *     introduced fresh here, with `doseApprovalId` provenance and no
+ *     `approvalStatus` field. The Nurse app, which reads a medication-order
+ *     shape directly, needs to confirm/adopt this same shape.
  */
 
 // ─── Shared enums / unions ──────────────────────────────────────────────────
@@ -295,21 +305,34 @@ export interface TreatmentPlan {
 }
 
 // ─── Dose ────────────────────────────────────────────────────────────────────
+// Two-step model matching the backend (POST /dose-approvals, then PATCH
+// .../{id}/approve): a dose approval cannot exist without the lab request
+// that justifies it, and a MAR item only exists as the product of an
+// approved one — so for the nurse, existence means approved.
 
 export interface DoseApproval {
   id: string;
   patientFileNo: string;
-  doctorId: string;
-  stageRef: string;
-  cycle: string;
-  lastDoseDate?: string;
-  recommendedDose: string;
-  approvedDose: string;
-  adjusted: boolean;
-  adjustmentReason?: string;
-  notes?: string;
-  preDoseLabId: string;
-  approvedAt: string;
+  labTestRequestId: string; // REQUIRED — the lab-before-dose gate, enforced server-side
+  status: "prepared" | "approved"; // TODO(api-contract): confirm exact values
+  approvedDose?: string; // set at the approve step
+  route?: string; // set at the approve step
+  marItemId?: string; // returned by the approve call
+  createdAt: string;
+  approvedAt?: string;
+  approvedBy?: string;
+}
+
+/** The nurse's administration item — produced only by an approved DoseApproval. */
+export interface MarItem {
+  id: string;
+  patientFileNo: string;
+  doseApprovalId?: string; // provenance link back to the approval that created it
+  medName: string;
+  dose: string;
+  route: string;
+  scheduledTime: string;
+  administrationStatus: "scheduled" | "ready" | "administered" | "missed";
 }
 
 // ─── Discharge ──────────────────────────────────────────────────────────────

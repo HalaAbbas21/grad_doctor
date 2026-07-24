@@ -88,7 +88,7 @@ function ResultsInner({ fileNo }: { fileNo: string }) {
                       <Check className="size-4" /> {t.labs.markReviewed}
                     </Button>
                   )}
-                  {l.tiedToDose && (
+                  {l.reviewed && (
                     <Button onClick={() => navigate(`/patients/${fileNo}/dose`)}>
                       <Syringe className="size-4" /> {t.dose.approve}
                     </Button>

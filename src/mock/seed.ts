@@ -79,7 +79,7 @@ export const labRequests: LabTestRequest[] = [
     status: "results-available",
     resultFilePath: "/mock-results/cbc-b3012.pdf",
     resultUploadDate: "2026-06-02T06:50:00",
-    reviewed: false,
+    reviewed: true,
     tiedToDose: true,
   },
   {
