@@ -1,9 +1,9 @@
+import { DEPARTMENT_LABELS_AR } from "@/constants/departments";
 import type {
   AppointmentStatus,
   AppointmentType,
   Caregiver,
   CaregiverEducation,
-  Department,
   Gender,
   LabPriority,
   LabRequestStatus,
@@ -256,11 +256,7 @@ export const t = {
 
 // ── Enum → Arabic label maps ──────────────────────────────────────────
 
-export const departmentLabel: Record<Department, string> = {
-  clinic: "العيادة",
-  daycare: "القسم النهاري",
-  inpatient: "القسم الداخلي",
-};
+export const departmentLabel = DEPARTMENT_LABELS_AR;
 
 export const lifeStatusLabel: Record<LifeStatus, string> = {
   alive: "حياة",

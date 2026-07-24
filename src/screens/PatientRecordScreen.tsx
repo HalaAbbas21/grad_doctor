@@ -33,7 +33,7 @@ import {
   priorityLabel,
   t,
 } from "@/i18n/ar";
-import type { Department } from "@/mock/types";
+import { DEPARTMENTS, type Department } from "@/constants/departments";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -454,9 +454,11 @@ function DestinationButton({
         <span className="text-sm font-bold">{t.patient.actions.setDestination}</span>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="inpatient">{departmentLabel.inpatient}</SelectItem>
-        <SelectItem value="daycare">{departmentLabel.daycare}</SelectItem>
-        <SelectItem value="clinic">{departmentLabel.clinic}</SelectItem>
+        {DEPARTMENTS.map((d) => (
+          <SelectItem key={d} value={d}>
+            {departmentLabel[d]}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

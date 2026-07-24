@@ -3,7 +3,7 @@ import { Building2, ChevronLeft, Stethoscope, Sun } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useAppStore } from "@/store/useAppStore";
 import { t } from "@/i18n/ar";
-import type { Department } from "@/mock/types";
+import type { Department } from "@/constants/departments";
 
 const OPTIONS: {
   key: Department;

@@ -19,8 +19,9 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAppStore } from "@/store/useAppStore";
 import { useToast } from "@/components/ui/toast";
 import { computeAge, formatDate } from "@/lib/utils";
+import { DEPARTMENTS, type Department } from "@/constants/departments";
 import { departmentLabel, t } from "@/i18n/ar";
-import type { Department, DischargeReport, Patient, PrescriptionItem } from "@/mock/types";
+import type { DischargeReport, Patient, PrescriptionItem } from "@/mock/types";
 
 export function DischargeScreen() {
   return (
@@ -147,9 +148,11 @@ function DischargeInner({ patient }: { patient: Patient }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="inpatient">{departmentLabel.inpatient}</SelectItem>
-                    <SelectItem value="daycare">{departmentLabel.daycare}</SelectItem>
-                    <SelectItem value="clinic">{departmentLabel.clinic}</SelectItem>
+                    {DEPARTMENTS.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {departmentLabel[d]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

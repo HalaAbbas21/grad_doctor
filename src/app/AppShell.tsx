@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/select";
 import { useAppStore } from "@/store/useAppStore";
 import { useUnreadCount } from "@/store/selectors";
+import { DEPARTMENTS, type Department } from "@/constants/departments";
 import { departmentLabel, t } from "@/i18n/ar";
-import type { Department } from "@/mock/types";
 import { GlobalSearch } from "./GlobalSearch";
 
 const NAV = [
@@ -71,9 +71,11 @@ export function AppShell() {
                 </span>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="clinic">{departmentLabel.clinic}</SelectItem>
-                <SelectItem value="daycare">{departmentLabel.daycare}</SelectItem>
-                <SelectItem value="inpatient">{departmentLabel.inpatient}</SelectItem>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {departmentLabel[d]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

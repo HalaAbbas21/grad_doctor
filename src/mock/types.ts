@@ -5,7 +5,11 @@
 
 // ─── Shared enums / unions ──────────────────────────────────────────────────
 
-export type Department = "clinic" | "daycare" | "inpatient";
+// Department is defined in src/constants/departments.ts (the single source of
+// truth for this value — it must match the backend exactly) and re-exported
+// here so existing `@/mock/types` imports keep working.
+import type { Department } from "@/constants/departments";
+export type { Department } from "@/constants/departments";
 
 export type LifeStatus =
   | "alive" // حياة

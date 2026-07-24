@@ -15,8 +15,8 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { useAppStore } from "@/store/useAppStore";
 import { useToast } from "@/components/ui/toast";
+import { DEPARTMENTS, type Department } from "@/constants/departments";
 import { departmentLabel, professionalStatusLabel, t } from "@/i18n/ar";
-import type { Department } from "@/mock/types";
 
 function Row({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
@@ -87,9 +87,11 @@ export function ProfileScreen() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="clinic">{departmentLabel.clinic}</SelectItem>
-              <SelectItem value="daycare">{departmentLabel.daycare}</SelectItem>
-              <SelectItem value="inpatient">{departmentLabel.inpatient}</SelectItem>
+              {DEPARTMENTS.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {departmentLabel[d]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </CardContent>
