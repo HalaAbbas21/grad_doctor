@@ -20,7 +20,7 @@ import { StageTimeline } from "@/components/StageTimeline";
 import { useAppStore } from "@/store/useAppStore";
 import { useToast } from "@/components/ui/toast";
 import { stageStatusLabel, t } from "@/i18n/ar";
-import type { Medication, StageStatus, TreatmentPlan, TreatmentStage } from "@/mock/types";
+import type { PhaseMedication, StageStatus, TreatmentPhase, TreatmentPlan } from "@/mock/types";
 
 export function TreatmentPlanScreen() {
   return (
@@ -30,13 +30,13 @@ export function TreatmentPlanScreen() {
   );
 }
 
-function emptyStage(planId: string, name = ""): TreatmentStage {
+function emptyStage(name = ""): TreatmentPhase {
   return {
     id: `st-${Date.now()}-${Math.round(performance.now())}`,
-    planId,
     stageName: name,
     startDate: "",
     endDate: "",
+    description: null,
     medications: [],
     procedures: "",
     cycles: 1,
@@ -58,13 +58,13 @@ function PlanInner({ fileNo }: { fileNo: string }) {
   const [startDate, setStartDate] = useState(existing?.startDate ?? "");
   const [endDate, setEndDate] = useState(existing?.estimatedEndDate ?? "");
   const [description, setDescription] = useState(existing?.overallDescription ?? "");
-  const [stages, setStages] = useState<TreatmentStage[]>(existing?.phases ?? []);
+  const [stages, setStages] = useState<TreatmentPhase[]>(existing?.phases ?? []);
   const [error, setError] = useState<string | null>(null);
 
-  const updateStage = (id: string, patch: Partial<TreatmentStage>) =>
+  const updateStage = (id: string, patch: Partial<TreatmentPhase>) =>
     setStages((ss) => ss.map((s) => (s.id === id ? { ...s, ...patch } : s)));
 
-  const addStage = (name = "") => setStages((ss) => [...ss, emptyStage(planId, name)]);
+  const addStage = (name = "") => setStages((ss) => [...ss, emptyStage(name)]);
   const removeStage = (id: string) => setStages((ss) => ss.filter((s) => s.id !== id));
 
   const addMed = (stageId: string) =>
@@ -75,7 +75,7 @@ function PlanInner({ fileNo }: { fileNo: string }) {
       ],
     });
 
-  const updateMed = (stageId: string, idx: number, patch: Partial<Medication>) => {
+  const updateMed = (stageId: string, idx: number, patch: Partial<PhaseMedication>) => {
     const stage = stages.find((s) => s.id === stageId);
     if (!stage) return;
     const meds = stage.medications.map((m, i) => (i === idx ? { ...m, ...patch } : m));
@@ -91,7 +91,7 @@ function PlanInner({ fileNo }: { fileNo: string }) {
   const validateChrono = (): boolean => {
     const dated = stages.filter((s) => s.startDate);
     for (let i = 1; i < dated.length; i++) {
-      if (dated[i].startDate < dated[i - 1].startDate) return false;
+      if ((dated[i].startDate ?? "") < (dated[i - 1].startDate ?? "")) return false;
     }
     return true;
   };
@@ -103,7 +103,7 @@ function PlanInner({ fileNo }: { fileNo: string }) {
     planName: planName || "خطة علاج",
     startDate,
     estimatedEndDate: endDate,
-    overallDescription: description || undefined,
+    overallDescription: description || null,
     phases: stages,
   });
 
@@ -198,19 +198,19 @@ function PlanInner({ fileNo }: { fileNo: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{t.plan.startDate}</Label>
-                  <Input type="date" value={s.startDate} onChange={(e) => updateStage(s.id, { startDate: e.target.value })} />
+                  <Input type="date" value={s.startDate ?? ""} onChange={(e) => updateStage(s.id, { startDate: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t.plan.endDate}</Label>
-                  <Input type="date" value={s.endDate} onChange={(e) => updateStage(s.id, { endDate: e.target.value })} />
+                  <Input type="date" value={s.endDate ?? ""} onChange={(e) => updateStage(s.id, { endDate: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t.plan.cycles}</Label>
-                  <Input type="number" value={s.cycles} onChange={(e) => updateStage(s.id, { cycles: Number(e.target.value) })} />
+                  <Input type="number" value={s.cycles ?? 0} onChange={(e) => updateStage(s.id, { cycles: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t.plan.visits}</Label>
-                  <Input type="number" value={s.visits} onChange={(e) => updateStage(s.id, { visits: Number(e.target.value) })} />
+                  <Input type="number" value={s.visits ?? 0} onChange={(e) => updateStage(s.id, { visits: Number(e.target.value) })} />
                 </div>
               </div>
 
@@ -226,7 +226,7 @@ function PlanInner({ fileNo }: { fileNo: string }) {
                   <div key={mi} className="grid grid-cols-1 gap-2 rounded-lg border border-border p-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
                     <Input placeholder={t.plan.medName} value={m.name} onChange={(e) => updateMed(s.id, mi, { name: e.target.value })} />
                     <Input placeholder={t.plan.dose} value={m.dose} onChange={(e) => updateMed(s.id, mi, { dose: e.target.value })} />
-                    <Input placeholder={t.plan.schedule} value={m.schedule} onChange={(e) => updateMed(s.id, mi, { schedule: e.target.value })} />
+                    <Input placeholder={t.plan.schedule} value={m.schedule ?? ""} onChange={(e) => updateMed(s.id, mi, { schedule: e.target.value })} />
                     <Button variant="ghost" size="icon" onClick={() => removeMed(s.id, mi)} aria-label={t.common.remove}>
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
@@ -237,11 +237,11 @@ function PlanInner({ fileNo }: { fileNo: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{t.plan.procedures}</Label>
-                  <Input value={s.procedures} onChange={(e) => updateStage(s.id, { procedures: e.target.value })} />
+                  <Input value={s.procedures ?? ""} onChange={(e) => updateStage(s.id, { procedures: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t.plan.milestones}</Label>
-                  <Input value={s.milestones} onChange={(e) => updateStage(s.id, { milestones: e.target.value })} />
+                  <Input value={s.milestones ?? ""} onChange={(e) => updateStage(s.id, { milestones: e.target.value })} />
                 </div>
               </div>
 

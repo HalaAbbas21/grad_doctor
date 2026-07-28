@@ -213,7 +213,6 @@ export const treatmentPlans: TreatmentPlan[] = [
     phases: [
       {
         id: "st-1",
-        planId: "plan-1",
         stageName: "مرحلة الحث",
         startDate: "2025-01-15",
         endDate: "2025-02-26",
@@ -231,7 +230,6 @@ export const treatmentPlans: TreatmentPlan[] = [
       },
       {
         id: "st-2",
-        planId: "plan-1",
         stageName: "مرحلة التوحيد",
         startDate: "2025-03-01",
         endDate: "2025-05-30",
@@ -248,7 +246,6 @@ export const treatmentPlans: TreatmentPlan[] = [
       },
       {
         id: "st-3",
-        planId: "plan-1",
         stageName: "مرحلة الصيانة",
         startDate: "2025-06-01",
         endDate: "2027-01-15",
@@ -276,10 +273,10 @@ export const treatmentPlans: TreatmentPlan[] = [
     phases: [
       {
         id: "st-4",
-        planId: "plan-2",
         stageName: "مرحلة الحث",
         startDate: "2025-02-01",
         endDate: "2025-03-14",
+        description: null,
         medications: [
           { name: "Vincristine", dose: "1.5 mg/m²", schedule: "أسبوعياً ×4" },
           { name: "Dexamethasone", dose: "6 mg/m²", schedule: "يومياً" },
@@ -292,10 +289,10 @@ export const treatmentPlans: TreatmentPlan[] = [
       },
       {
         id: "st-5",
-        planId: "plan-2",
         stageName: "مرحلة التوحيد",
         startDate: "2025-03-15",
         endDate: "2025-07-01",
+        description: null,
         medications: [{ name: "Cytarabine", dose: "75 mg/m²", schedule: "×4 أيام لكل دورة" }],
         procedures: "بزل قطني ×2",
         cycles: 2,
@@ -308,18 +305,23 @@ export const treatmentPlans: TreatmentPlan[] = [
 ];
 
 // ── Appointments ────────────────────────────────────────────────────
+// NOTE: this mock array is no longer read by any screen — the Home dashboard's
+// appointments widget now calls the real GET /appointments API instead. Kept
+// only because useAppStore's mock state still declares an `appointments` field.
 export const appointments: Appointment[] = [
-  { id: "ap-1", patientFileNo: "B-1042", doctorId: DOCTOR_ID, dateTime: "2026-06-02T09:00:00", type: "follow-up", status: "checked-in", assignedStaff: "ممرضة: هناء" },
-  { id: "ap-2", patientFileNo: "B-1077", doctorId: DOCTOR_ID, dateTime: "2026-06-02T09:30:00", type: "initial", status: "scheduled", assignedStaff: "ممرضة: رولا" },
-  { id: "ap-3", patientFileNo: "B-1090", doctorId: DOCTOR_ID, dateTime: "2026-06-02T10:00:00", type: "follow-up", status: "scheduled", assignedStaff: "ممرضة: هناء" },
-  { id: "ap-4", patientFileNo: "B-1101", doctorId: DOCTOR_ID, dateTime: "2026-06-02T10:30:00", type: "follow-up", status: "scheduled", assignedStaff: "ممرضة: رولا" },
-  { id: "ap-5", patientFileNo: "B-2031", doctorId: DOCTOR_ID, dateTime: "2026-06-02T08:00:00", type: "follow-up", status: "checked-in", assignedStaff: "ممرضة: سعاد" },
+  { id: "ap-1", patientFileNo: "B-1042", patientName: "مريض 1042", department: "clinic", doctorId: DOCTOR_ID, doctorName: `${doctor.firstName} ${doctor.lastName}`, scheduledAt: "2026-06-02T09:00:00.000000Z", type: "follow_up", status: "scheduled", notes: null },
+  { id: "ap-2", patientFileNo: "B-1077", patientName: "مريض 1077", department: "clinic", doctorId: DOCTOR_ID, doctorName: `${doctor.firstName} ${doctor.lastName}`, scheduledAt: "2026-06-02T09:30:00.000000Z", type: "initial_exam", status: "scheduled", notes: null },
+  { id: "ap-3", patientFileNo: "B-1090", patientName: "مريض 1090", department: "daycare", doctorId: DOCTOR_ID, doctorName: `${doctor.firstName} ${doctor.lastName}`, scheduledAt: "2026-06-02T10:00:00.000000Z", type: "follow_up", status: "scheduled", notes: null },
+  { id: "ap-4", patientFileNo: "B-1101", patientName: "مريض 1101", department: "daycare", doctorId: DOCTOR_ID, doctorName: `${doctor.firstName} ${doctor.lastName}`, scheduledAt: "2026-06-02T10:30:00.000000Z", type: "follow_up", status: "cancelled", notes: null },
+  { id: "ap-5", patientFileNo: "B-2031", patientName: "مريض 2031", department: "inpatient", doctorId: DOCTOR_ID, doctorName: `${doctor.firstName} ${doctor.lastName}`, scheduledAt: "2026-06-02T08:00:00.000000Z", type: "follow_up", status: "scheduled", notes: null },
 ];
 
 // ── Clinical notes ──────────────────────────────────────────────────
+// NOTE: no longer read by any screen — the patient record's notes tab now
+// calls the real GET/POST /clinical-notes API instead.
 export const clinicalNotes: ClinicalNote[] = [
-  { id: "note-1", patientFileNo: "B-1042", doctorId: DOCTOR_ID, authorName: "د. ليلى حدّاد", text: "تحسن ملحوظ، استمرار البروتوكول. مراقبة الحرارة منزلياً.", createdAt: "2026-05-20T10:00:00" },
-  { id: "note-2", patientFileNo: "B-2031", doctorId: DOCTOR_ID, authorName: "د. ليلى حدّاد", text: "العدلات ضمن الحد المقبول للجرعة القادمة.", createdAt: "2026-06-01T13:00:00" },
+  { id: "note-1", patientFileNo: "B-1042", authorId: DOCTOR_ID, authorName: "د. ليلى حدّاد", body: "تحسن ملحوظ، استمرار البروتوكول. مراقبة الحرارة منزلياً.", kind: "clinical", createdAt: "2026-05-20T10:00:00" },
+  { id: "note-2", patientFileNo: "B-2031", authorId: DOCTOR_ID, authorName: "د. ليلى حدّاد", body: "العدلات ضمن الحد المقبول للجرعة القادمة.", kind: "clinical", createdAt: "2026-06-01T13:00:00" },
 ];
 
 // ── Discharge reports (history) ─────────────────────────────────────

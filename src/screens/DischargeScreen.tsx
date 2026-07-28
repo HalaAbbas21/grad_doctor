@@ -18,7 +18,7 @@ import { PatientScreenFrame } from "@/components/PatientScreenFrame";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAppStore } from "@/store/useAppStore";
 import { useToast } from "@/components/ui/toast";
-import { computeAge, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
 import { departmentLabel, t } from "@/i18n/ar";
 import type { DischargeReport, Patient, PrescriptionItem } from "@/mock/types";
@@ -58,7 +58,7 @@ function DischargeInner({ patient }: { patient: Patient }) {
       id: `dis-${Date.now()}`,
       patientFileNo: fileNo,
       doctorId: doctor.id,
-      stageRef: patient.currentPhase,
+      stageRef: patient.currentPhase ?? "—",
       lastDoseDate: lastDoseDate || undefined,
       prescription: prescription.filter((r) => r.med.trim()),
       doctorInstructions: instructions,
@@ -174,7 +174,8 @@ function DischargeInner({ patient }: { patient: Patient }) {
           <div className="bg-hope p-5 text-white">
             <p className="font-display text-lg font-bold">{t.appName} · {t.discharge.title}</p>
             <p className="text-sm opacity-90">
-              {patient.firstName} {patient.familyName} · {computeAge(patient.dob)} {t.common.years}
+              {patient.firstName} {patient.familyName} ·{" "}
+              {patient.age != null ? `${patient.age} ${t.common.years}` : "—"}
             </p>
             <p className="font-mono text-xs opacity-90">{patient.fileNoBasma}</p>
           </div>

@@ -1,7 +1,10 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toast";
-import { useAppStore } from "@/store/useAppStore";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useAuthStore } from "@/store/auth.store";
+import { ProtectedRoute } from "@/app/guards/ProtectedRoute";
 import { AppShell } from "@/app/AppShell";
 import { LoginScreen } from "@/screens/LoginScreen";
 import { DepartmentSelectScreen } from "@/screens/DepartmentSelectScreen";
@@ -19,44 +22,43 @@ import { LabsScreen } from "@/screens/LabsScreen";
 import { NotificationsScreen } from "@/screens/NotificationsScreen";
 import { ProfileScreen } from "@/screens/ProfileScreen";
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const authenticated = useAppStore((s) => s.authenticated);
-  const location = useLocation();
-  if (!authenticated) return <Navigate to="/login" state={{ from: location }} replace />;
-  return <>{children}</>;
-}
-
 export default function App() {
+  useEffect(() => {
+    useAuthStore.getState().bootstrap();
+  }, []);
+
   return (
     <TooltipProvider delayDuration={200}>
-      <Routes>
-        <Route path="/login" element={<LoginScreen />} />
-        <Route path="/select-department" element={<DepartmentSelectScreen />} />
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/login" element={<LoginScreen />} />
+          <Route path="/select-department" element={<DepartmentSelectScreen />} />
 
-        <Route
-          element={
-            <RequireAuth>
-              <AppShell />
-            </RequireAuth>
-          }
-        >
-          <Route path="/" element={<DashboardScreen />} />
-          <Route path="/patients" element={<PatientsScreen />} />
-          <Route path="/patients/:fileNo" element={<PatientRecordScreen />} />
-          <Route path="/patients/:fileNo/document" element={<DocumentationScreen />} />
-          <Route path="/patients/:fileNo/lab-request" element={<LabRequestScreen />} />
-          <Route path="/patients/:fileNo/results" element={<ResultsScreen />} />
-          <Route path="/patients/:fileNo/dose" element={<DoseApprovalScreen />} />
-          <Route path="/patients/:fileNo/plan" element={<TreatmentPlanScreen />} />
-          <Route path="/patients/:fileNo/discharge" element={<DischargeScreen />} />
-          <Route path="/labs" element={<LabsScreen />} />
-          <Route path="/consult-requests" element={<ConsultRequestsScreen />} />
-          <Route path="/notifications" element={<NotificationsScreen />} />
-          <Route path="/profile" element={<ProfileScreen />} />
-        </Route>
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/" element={<DashboardScreen />} />
+            <Route path="/patients" element={<PatientsScreen />} />
+            <Route path="/patients/:fileNo" element={<PatientRecordScreen />} />
+            <Route path="/patients/:fileNo/document" element={<DocumentationScreen />} />
+            <Route path="/patients/:fileNo/lab-request" element={<LabRequestScreen />} />
+            <Route path="/patients/:fileNo/results" element={<ResultsScreen />} />
+            <Route path="/patients/:fileNo/dose" element={<DoseApprovalScreen />} />
+            <Route path="/patients/:fileNo/plan" element={<TreatmentPlanScreen />} />
+            <Route path="/patients/:fileNo/discharge" element={<DischargeScreen />} />
+            <Route path="/labs" element={<LabsScreen />} />
+            <Route path="/consult-requests" element={<ConsultRequestsScreen />} />
+            <Route path="/notifications" element={<NotificationsScreen />} />
+            <Route path="/profile" element={<ProfileScreen />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ErrorBoundary>
       <Toaster />
     </TooltipProvider>
   );

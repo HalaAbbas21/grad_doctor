@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -9,74 +8,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { EmptyState, ListSkeleton } from "@/components/ui/states";
+import { EmptyState, ErrorState, ListSkeleton } from "@/components/ui/states";
 import { PageHeader } from "@/components/PageHeader";
-import { PatientRow } from "@/components/PatientRow";
+import { PatientListRow } from "@/components/PatientListRow";
 import { useAppStore } from "@/store/useAppStore";
-import { useMockLoad } from "@/hooks/useMockLoad";
-import { departmentLabel, queueStatusLabel, t } from "@/i18n/ar";
-import type { PatientQueueStatus } from "@/mock/types";
+import { usePatients } from "@/hooks/usePatients";
+import { departmentLabel, t } from "@/i18n/ar";
 
-type SortKey = "token" | "waiting" | "name";
+type SortKey = "name" | "registrationDate";
 
 export function PatientsScreen() {
-  const { patients, department, documentations, pendingDischargeFileNos } = useAppStore();
-  const [params] = useSearchParams();
-  const filterParam = params.get("filter");
-  const { loading } = useMockLoad([department]);
+  const department = useAppStore((s) => s.department);
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<PatientQueueStatus | "all">(
-    filterParam === "awaiting-dose-approval" ? "awaiting-dose-approval" : "all"
-  );
-  const [sort, setSort] = useState<SortKey>("token");
+  const [sort, setSort] = useState<SortKey>("name");
 
-  const draftFileNos = useMemo(
-    () => new Set(documentations.filter((d) => d.status === "draft").map((d) => d.patientFileNo)),
-    [documentations]
-  );
+  const { items, departmentCount, isLoading, isError, refetch } = usePatients({
+    department,
+    search: query,
+  });
 
   const list = useMemo(() => {
-    let rows = patients.filter((p) => p.department === department);
-
-    // Deep-link filters from the dashboard
-    if (filterParam === "drafts") rows = rows.filter((p) => draftFileNos.has(p.fileNoBasma));
-    if (filterParam === "discharge")
-      rows = rows.filter((p) => pendingDischargeFileNos.includes(p.fileNoBasma));
-
-    if (statusFilter !== "all") rows = rows.filter((p) => p.queueStatus === statusFilter);
-
-    const q = query.trim().toLowerCase();
-    if (q) {
-      rows = rows.filter(
-        (p) =>
-          p.fileNoBasma.toLowerCase().includes(q) ||
-          p.fileNoBiruni.toLowerCase().includes(q) ||
-          `${p.firstName} ${p.familyName}`.toLowerCase().includes(q)
-      );
-    }
-
-    rows = [...rows].sort((a, b) => {
-      if (sort === "name") return `${a.firstName}`.localeCompare(`${b.firstName}`, "ar");
-      if (sort === "waiting")
-        return (a.waitingSince ?? "9").localeCompare(b.waitingSince ?? "9");
-      return (a.tokenNumber ?? 99) - (b.tokenNumber ?? 99);
+    return [...items].sort((a, b) => {
+      if (sort === "registrationDate") return b.registrationDate.localeCompare(a.registrationDate);
+      return a.fullName.localeCompare(b.fullName, "ar");
     });
-    return rows;
-  }, [patients, department, filterParam, statusFilter, query, sort, draftFileNos, pendingDischargeFileNos]);
-
-  const filterTitle =
-    filterParam === "drafts"
-      ? t.dashboard.incompleteDrafts
-      : filterParam === "discharge"
-        ? t.dashboard.pendingDischarge
-        : t.nav.patients;
+  }, [items, sort]);
 
   return (
     <div>
-      <PageHeader title={filterTitle} subtitle={`${departmentLabel[department]} · ${list.length} مريض`} />
+      <PageHeader title={t.nav.patients} subtitle={`${departmentLabel[department]} · ${list.length} مريض`} />
 
-      {/* Search + filters */}
+      {/* Search + sort */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -87,44 +50,31 @@ export function PatientsScreen() {
             className="pe-10"
           />
         </div>
-        <div className="flex gap-3">
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PatientQueueStatus | "all")}>
-            <SelectTrigger className="w-40">
-              <span className="flex items-center gap-2">
-                <SlidersHorizontal className="size-4 text-muted-foreground" />
-                <SelectValue />
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.common.all}</SelectItem>
-              {(Object.keys(queueStatusLabel) as PatientQueueStatus[]).map((s) => (
-                <SelectItem key={s} value={s}>
-                  {queueStatusLabel[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="token">{t.common.token}</SelectItem>
-              <SelectItem value="waiting">{t.common.waitingTime}</SelectItem>
-              <SelectItem value="name">{t.common.name}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">{t.common.name}</SelectItem>
+            <SelectItem value="registrationDate">{t.common.date}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <ListSkeleton rows={6} />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : list.length === 0 ? (
-        <EmptyState title="لا يوجد مرضى مطابقون" description="جرّب تعديل البحث أو عوامل التصفية." />
+        departmentCount === 0 ? (
+          <EmptyState tone="success" title={t.patient.noPatientsInDepartment} />
+        ) : (
+          <EmptyState title={t.patient.noPatientsMatching} description={t.patient.adjustSearch} />
+        )
       ) : (
         <div className="space-y-3">
           {list.map((p) => (
-            <PatientRow key={p.fileNoBasma} patient={p} />
+            <PatientListRow key={p.fileNoBasma} patient={p} />
           ))}
         </div>
       )}

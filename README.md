@@ -1,8 +1,8 @@
 # بسمة — تطبيق الطبيب (Doctor Dashboard)
 
-منصّة أورام الأطفال — تطبيق الطبيب. واجهة **عربية RTL** عالية الجودة، **متجاوبة** (هاتف · لوحي · سطح مكتب)، مبنية بـ **React 18 + Vite + TypeScript + Tailwind**، مع **بيانات وهمية فقط** (لا يوجد backend).
+منصّة أورام الأطفال — تطبيق الطبيب. واجهة **عربية RTL** عالية الجودة، **متجاوبة** (هاتف · لوحي · سطح مكتب)، مبنية بـ **React 18 + Vite + TypeScript + Tailwind**. **تسجيل الدخول متصل بخادم حقيقي (Laravel Sanctum)**؛ بقية الشاشات ما تزال تعمل على **بيانات وهمية**.
 
-> A production-quality, responsive, RTL-Arabic frontend for the Basma pediatric-oncology Doctor application. Mock data only — every write lives in local state (Zustand).
+> A production-quality, responsive, RTL-Arabic frontend for the Basma pediatric-oncology Doctor application. Login/auth is wired to the real backend (Laravel Sanctum); every other screen still reads/writes mock data in local state (Zustand).
 
 ---
 
@@ -10,13 +10,27 @@
 
 ```bash
 npm install
+cp .env.example .env.local   # أول مرة فقط
 npm run dev        # خادم التطوير على http://localhost:5173
 npm run build      # فحص الأنواع (tsc) + بناء الإنتاج
 npm run preview    # معاينة بناء الإنتاج
 npm run typecheck  # فحص الأنواع فقط
 ```
 
-**الدخول:** أي بيانات تعمل (نظام تجريبي). بعد الدخول اختر القسم (العيادة / النهاري / الداخلي) ثم تصل إلى لوحة الطبيب.
+**الدخول:** يتطلب حساب طبيب أو مدير حقيقياً على خادم بسمة (`email` + `password`) — لم يعد بالإمكان الدخول بأي بيانات. بعد الدخول اختر القسم (العيادة / النهاري / الداخلي) ثم تصل إلى لوحة الطبيب.
+
+### الاتصال بالخادم / Backend connection
+
+المتغيرات في `.env.local` (انظر `.env.example`):
+
+```
+VITE_API_BASE_URL=http://api.basma-unit.cloud:8080/api   # جرّب هذا أولاً
+# VITE_API_BASE_URL=/api                                 # بديل: بروكسي Vite أدناه
+VITE_USE_MOCK=true
+```
+
+- **جرّب الرابط المباشر أولاً.** إن ظهر خطأ CORS في المتصفح (الخادم على `http://` منفذ `8080` وقد لا يسمح بمصدر `localhost`)، بدّل `VITE_API_BASE_URL` إلى `/api` وأعد تشغيل `npm run dev` — طلبات `/api` تُمرَّر عبر بروكسي Vite المُعرَّف في `vite.config.ts` إلى الخادم الحقيقي، فيتجنّب المتصفح مشكلة CORS تماماً.
+- `VITE_USE_MOCK` تبقى `true` — شاشات الميزات (المرضى، المخابر، …) لا تزال تقرأ بيانات وهمية بغضّ النظر عن هذا المتغيّر؛ الدخول فقط متصل فعلياً.
 
 ---
 

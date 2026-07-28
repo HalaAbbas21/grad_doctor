@@ -1,7 +1,5 @@
 import { DEPARTMENT_LABELS_AR } from "@/constants/departments";
 import type {
-  AppointmentStatus,
-  AppointmentType,
   Caregiver,
   CaregiverEducation,
   ConsultationType,
@@ -81,13 +79,14 @@ export const t = {
   login: {
     title: "تسجيل الدخول",
     subtitle: "منصّة بسمة لأورام الأطفال — تطبيق الطبيب",
-    username: "اسم المستخدم",
+    email: "البريد الإلكتروني",
     password: "كلمة المرور",
     signIn: "دخول",
     biometric: "الدخول بالبصمة",
     pin: "إدخال الرمز السري",
     lockout: "تم تجاوز عدد المحاولات. حاول بعد دقيقة.",
-    hint: "استخدم أي بيانات للدخول (نظام تجريبي).",
+    hint: "أدخل بيانات حسابك في نظام بسمة.",
+    notDoctorAccount: "هذا الحساب ليس حساب طبيب",
   },
 
   departments: {
@@ -136,6 +135,10 @@ export const t = {
     lifeStatus: "الحالة الحياتية",
     criticalFlags: "تنبيهات حرجة",
     guardianContact: "تواصل مع ولي الأمر",
+    partialRegistration: "تسجيل غير مكتمل",
+    noPatientsInDepartment: "لا يوجد مرضى",
+    noPatientsMatching: "لا يوجد مرضى مطابقون",
+    adjustSearch: "جرّب تعديل كلمة البحث.",
     actions: {
       requestLab: "طلب فحص",
       reviewResults: "مراجعة النتائج",
@@ -346,16 +349,36 @@ export const stageStatusLabel: Record<StageStatus, string> = {
   pending: "معلّقة",
 };
 
-export const appointmentTypeLabel: Record<AppointmentType, string> = {
-  "follow-up": "متابعة",
-  initial: "فحص أولي",
+// TODO(api-contract): only "initial_exam"/"follow_up" (type) and
+// "scheduled"/"cancelled" (status) have been observed. These are partial
+// maps, not exhaustive unions — render sites must fall back to the raw
+// value for anything unrecognized (e.g. `appointmentTypeLabel[a.type] ?? a.type`).
+export const appointmentTypeLabel: Record<string, string> = {
+  initial_exam: "فحص أولي",
+  follow_up: "متابعة",
 };
 
-export const appointmentStatusLabel: Record<AppointmentStatus, string> = {
+export const appointmentStatusLabel: Record<string, string> = {
   scheduled: "مجدول",
-  "checked-in": "تم الحضور",
-  done: "منتهٍ",
-  missed: "فائت",
+  cancelled: "ملغى",
+};
+
+// TODO(api-contract): only "served" has been observed; "waiting"/"called"
+// are expected but unconfirmed. Fall back to the raw value for anything else
+// (e.g. `queueItemStatusLabel[q.status] ?? q.status`).
+export const queueItemStatusLabel: Record<string, string> = {
+  served: "تمت الخدمة",
+  waiting: "بالانتظار",
+  called: "تم الاستدعاء",
+};
+
+// TODO(api-contract): only "in_progress" has been observed on a treatment
+// phase; "completed"/"pending" are expected but unconfirmed. Fall back to the
+// raw value for anything else (e.g. `phaseStatusLabel[p.status] ?? p.status`).
+export const phaseStatusLabel: Record<string, string> = {
+  in_progress: "قيد التنفيذ",
+  completed: "مكتملة",
+  pending: "قادمة",
 };
 
 export const notificationTypeLabel: Record<NotificationType, string> = {

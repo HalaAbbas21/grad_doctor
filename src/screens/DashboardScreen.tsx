@@ -1,51 +1,77 @@
 import { useNavigate } from "react-router-dom";
 import {
+  AlertTriangle,
   Bell,
   CalendarClock,
+  CheckCircle2,
   ClipboardList,
   FileCheck2,
+  FileText,
   FlaskConical,
   Globe,
+  Hourglass,
+  PhoneCall,
   Search,
   Stethoscope,
   Syringe,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState, ListSkeleton } from "@/components/ui/states";
+import { EmptyState, ErrorState, ListSkeleton } from "@/components/ui/states";
 import { CountCard } from "@/components/CountCard";
-import { PatientRow } from "@/components/PatientRow";
 import { useAppStore } from "@/store/useAppStore";
-import { useDashboardCounts, useDepartmentQueue } from "@/store/selectors";
+import { useDashboardCounts } from "@/store/selectors";
 import { useMockLoad } from "@/hooks/useMockLoad";
-import { formatDate, timeSince } from "@/lib/utils";
+import { useAppointments } from "@/hooks/useAppointments";
+import { useQueues } from "@/hooks/useQueues";
+import { cn, damascusDateKey, formatDate, formatTime, timeSince } from "@/lib/utils";
 import {
   appointmentStatusLabel,
   appointmentTypeLabel,
   departmentLabel,
   notificationTypeLabel,
+  queueItemStatusLabel,
   t,
 } from "@/i18n/ar";
 
+const QUEUE_STATUS_ICON: Record<string, React.ReactNode> = {
+  served: <CheckCircle2 className="size-3.5" />,
+  waiting: <Hourglass className="size-3.5" />,
+  called: <PhoneCall className="size-3.5" />,
+};
+
+const QUEUE_STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
+  served: "muted",
+  waiting: "warning",
+  called: "primary",
+};
+
 export function DashboardScreen() {
   const navigate = useNavigate();
-  const { doctor, department, appointments, notifications, patients } = useAppStore();
+  const { doctor, department, notifications } = useAppStore();
   const counts = useDashboardCounts();
-  const queue = useDepartmentQueue();
   const { loading } = useMockLoad([department]);
+  const {
+    items: todayAppointments,
+    isLoading: appointmentsLoading,
+    isError: appointmentsError,
+    refetch: refetchAppointments,
+  } = useAppointments({ department });
+  const {
+    items: queueItems,
+    isLoading: queueLoading,
+    isError: queueError,
+    refetch: refetchQueue,
+  } = useQueues(department);
 
   const today = formatDate(new Date().toISOString());
-  const deptAppts = appointments.filter(
-    (a) => patients.find((p) => p.fileNoBasma === a.patientFileNo)?.department === department
-  );
+  const todayKey = damascusDateKey(new Date().toISOString());
+  // "Today" is client-side against Asia/Damascus — no date/today filter param is confirmed for GET /queues.
+  // TODO(api-contract): confirm a date/today filter param exists server-side.
+  const todayQueue = queueItems.filter((q) => q.queueDate === todayKey);
   const recentNotifs = notifications.slice(0, 4);
-
-  const patientName = (fileNo: string) => {
-    const p = patients.find((x) => x.fileNoBasma === fileNo);
-    return p ? `${p.firstName} ${p.familyName}` : fileNo;
-  };
 
   return (
     <div className="space-y-6">
@@ -143,14 +169,51 @@ export function DashboardScreen() {
               {t.dashboard.viewAll}
             </Button>
           </div>
-          {loading ? (
+          {queueLoading ? (
             <ListSkeleton rows={4} />
-          ) : queue.length === 0 ? (
+          ) : queueError ? (
+            <ErrorState onRetry={() => refetchQueue()} />
+          ) : todayQueue.length === 0 ? (
             <EmptyState tone="success" title={t.dashboard.allClear} />
           ) : (
             <div className="space-y-3">
-              {queue.slice(0, 6).map((p) => (
-                <PatientRow key={p.fileNoBasma} patient={p} />
+              {todayQueue.slice(0, 6).map((q) => (
+                <Card
+                  key={q.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/patients/${q.patientFileNo}`)}
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`/patients/${q.patientFileNo}`)}
+                  className="flex cursor-pointer items-center gap-3 p-3.5 transition-all hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  <span className="flex size-10 shrink-0 flex-col items-center justify-center rounded-xl bg-muted text-center leading-none">
+                    <span className="text-[9px] text-muted-foreground">{t.common.token}</span>
+                    <span className="text-base font-bold text-foreground">{q.number}</span>
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="primary" className="font-mono">
+                        <FileText className="size-3.5" />
+                        {q.patientFileNo}
+                      </Badge>
+                      <span className="font-bold text-foreground">{q.patientName}</span>
+                    </div>
+                    {q.isEmergency && (
+                      <p className="mt-1">
+                        <Badge variant="warning">
+                          <AlertTriangle className="size-3.5" />
+                          طارئ
+                        </Badge>
+                      </p>
+                    )}
+                  </div>
+
+                  <Badge variant={QUEUE_STATUS_VARIANT[q.status] ?? "outline"}>
+                    {QUEUE_STATUS_ICON[q.status]}
+                    {queueItemStatusLabel[q.status] ?? q.status}
+                  </Badge>
+                </Card>
               ))}
             </div>
           )}
@@ -162,40 +225,45 @@ export function DashboardScreen() {
             <h2 className="mb-3 text-lg font-bold text-foreground">{t.dashboard.todayAppointments}</h2>
             <Card>
               <CardContent className="p-2">
-                {loading ? (
+                {appointmentsLoading ? (
                   <div className="space-y-2 p-2">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Skeleton key={i} className="h-12" />
                     ))}
                   </div>
-                ) : deptAppts.length === 0 ? (
+                ) : appointmentsError ? (
+                  <ErrorState onRetry={() => refetchAppointments()} />
+                ) : todayAppointments.length === 0 ? (
                   <EmptyState title="لا مواعيد اليوم" />
                 ) : (
                   <ul className="divide-y divide-border">
-                    {deptAppts.map((a) => (
-                      <li
-                        key={a.id}
-                        className="flex cursor-pointer items-center gap-3 rounded-lg p-3 transition hover:bg-muted"
-                        onClick={() => navigate(`/patients/${a.patientFileNo}`)}
-                      >
-                        <span className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
-                          <CalendarClock className="size-4" />
-                          <span className="text-[10px] font-bold">
-                            {new Date(a.dateTime).toLocaleTimeString("ar-EG", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                    {todayAppointments.map((a) => {
+                      const cancelled = a.status === "cancelled";
+                      return (
+                        <li
+                          key={a.id}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg p-3 transition hover:bg-muted"
+                          onClick={() => navigate(`/patients/${a.patientFileNo}`)}
+                        >
+                          <span className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
+                            <CalendarClock className="size-4" />
+                            <span className="text-[10px] font-bold">{formatTime(a.scheduledAt)}</span>
                           </span>
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-bold">{patientName(a.patientFileNo)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            <span className="font-mono">{a.patientFileNo}</span> · {appointmentTypeLabel[a.type]}
-                          </p>
-                        </div>
-                        <Badge variant="muted">{appointmentStatusLabel[a.status]}</Badge>
-                      </li>
-                    ))}
+                          <div className={cn("min-w-0 flex-1", cancelled && "opacity-60")}>
+                            <p className={cn("truncate font-bold", cancelled && "line-through")}>
+                              {a.patientName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              <span className="font-mono">{a.patientFileNo}</span> ·{" "}
+                              {appointmentTypeLabel[a.type] ?? a.type}
+                            </p>
+                          </div>
+                          <Badge variant={cancelled ? "destructive" : "muted"}>
+                            {appointmentStatusLabel[a.status] ?? a.status}
+                          </Badge>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </CardContent>

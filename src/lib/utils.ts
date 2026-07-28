@@ -21,14 +21,14 @@ export function computeAge(dob: string): number {
 }
 
 /** Arabic-friendly short date (Gregorian). */
-export function formatDate(iso?: string): string {
+export function formatDate(iso?: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
 }
 
-export function formatDateTime(iso?: string): string {
+export function formatDateTime(iso?: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
@@ -39,6 +39,26 @@ export function formatDateTime(iso?: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Arabic-friendly time-only (no date) — e.g. for splitting a full ISO datetime at render time. */
+export function formatTime(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+}
+
+const DAMASCUS_DATE_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Damascus",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** "YYYY-MM-DD" for the given instant, in Asia/Damascus — used to compare "is this today" client-side when no server-side date filter is confirmed. */
+export function damascusDateKey(iso: string): string {
+  return DAMASCUS_DATE_FORMAT.format(new Date(iso));
 }
 
 /** Relative "since" in Arabic for waiting times / notifications. */

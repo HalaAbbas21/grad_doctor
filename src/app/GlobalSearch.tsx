@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/store/useAppStore";
-import { computeAge } from "@/lib/utils";
 import { queueStatusLabel } from "@/i18n/ar";
 import { t } from "@/i18n/ar";
 
@@ -34,7 +33,8 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const results = q
     ? patients
         .map((p) => {
-          const fileMatch = p.fileNoBasma.toLowerCase().includes(q) || p.fileNoBiruni.toLowerCase().includes(q);
+          const fileMatch =
+            p.fileNoBasma.toLowerCase().includes(q) || (p.fileNoBiruni ?? "").toLowerCase().includes(q);
           const nameMatch = `${p.firstName} ${p.familyName}`.toLowerCase().includes(q);
           return { p, score: fileMatch ? 0 : nameMatch ? 1 : 2 };
         })
@@ -70,10 +70,10 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                   </span>
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {computeAge(p.dob)} {t.common.years} · {p.diagnosis}
+                  {p.age != null ? `${p.age} ${t.common.years}` : "—"} · {p.diagnosis ?? "—"}
                 </span>
               </div>
-              <Badge variant="muted">{queueStatusLabel[p.queueStatus]}</Badge>
+              {p.queueStatus && <Badge variant="muted">{queueStatusLabel[p.queueStatus]}</Badge>}
             </CommandItem>
           ))}
         </CommandGroup>

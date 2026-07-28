@@ -2,44 +2,42 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Check,
+  Circle,
   ClipboardEdit,
   FileCheck2,
   FilePlus2,
   FlaskConical,
+  Loader2,
   MapPinned,
-  MessageSquarePlus,
   Send,
-  Stethoscope,
   Syringe,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { EmptyState } from "@/components/ui/states";
+import { EmptyState, ErrorState, ListSkeleton } from "@/components/ui/states";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { PatientContextBar } from "@/components/PatientContextBar";
-import { StageTimeline } from "@/components/StageTimeline";
-import { ConsultStatusBadge, LabStatusBadge, StageStatusBadge } from "@/components/StatusBadge";
 import { ConsultTypeBadge } from "@/components/consult-type-badge";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAppStore } from "@/store/useAppStore";
+import { usePatient } from "@/hooks/usePatient";
+import { useClinicalNotes, useCreateClinicalNote } from "@/hooks/useClinicalNotes";
+import { useTreatmentPlans } from "@/hooks/useTreatmentPlans";
 import { useToast } from "@/components/ui/toast";
-import { computeAge, formatDate, formatDateTime } from "@/lib/utils";
-import { testLabel } from "@/mock/laboratories";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import {
   caregiverEducationLabel,
   caregiverLabel,
-  consultTypeLabel,
   departmentLabel,
   genderLabel,
   nationalityLabel,
-  priorityLabel,
+  phaseStatusLabel,
   t,
 } from "@/i18n/ar";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
-import type { ConsultRequest } from "@/mock/types";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -54,64 +52,38 @@ export function PatientRecordScreen() {
   const { fileNo = "" } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const patients = useAppStore((s) => s.patients);
-  const documentations = useAppStore((s) => s.documentations);
-  const treatmentPlans = useAppStore((s) => s.treatmentPlans);
-  const labRequests = useAppStore((s) => s.labRequests);
-  const notes = useAppStore((s) => s.notes);
-  const dischargeReports = useAppStore((s) => s.dischargeReports);
-  const appointments = useAppStore((s) => s.appointments);
-  const consultRequests = useAppStore((s) => s.consultRequests);
-  const addNote = useAppStore((s) => s.addNote);
   const setPatientDestination = useAppStore((s) => s.setPatientDestination);
-  const coordinateConsultRequest = useAppStore((s) => s.coordinateConsultRequest);
-  const doctor = useAppStore((s) => s.doctor);
 
-  const patient = patients.find((p) => p.fileNoBasma === fileNo);
-  const [noteText, setNoteText] = useState("");
-  const [consultTarget, setConsultTarget] = useState<ConsultRequest | null>(null);
+  const { data: patient, isLoading, isError, error, refetch } = usePatient(fileNo);
 
-  if (!patient) {
+  if (isLoading) {
     return (
-      <div className="py-10">
-        <EmptyState title="لم يتم العثور على المريض" description={`رقم الإضبارة: ${fileNo}`} />
-        <div className="mt-4 text-center">
-          <Button variant="outline" onClick={() => navigate("/patients")}>
-            {t.common.back}
-          </Button>
-        </div>
+      <div className="space-y-4">
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <ListSkeleton rows={4} />
       </div>
     );
   }
 
-  const docs = documentations.filter((d) => d.patientFileNo === fileNo);
-  const plan = treatmentPlans.find((p) => p.patientFileNo === fileNo);
-  const labs = labRequests.filter((l) => l.patientFileNo === fileNo);
-  const patientNotes = notes.filter((n) => n.patientFileNo === fileNo);
-  const discharges = dischargeReports.filter((d) => d.patientFileNo === fileNo);
-  const appts = appointments.filter((a) => a.patientFileNo === fileNo);
-  const consults = consultRequests.filter((c) => c.patientFileNo === fileNo);
-
-  const confirmCoordinate = () => {
-    if (!consultTarget) return;
-    coordinateConsultRequest(consultTarget.id);
-    toast.success(t.consult.coordinated, consultTypeLabel[consultTarget.consultationType]);
-    setConsultTarget(null);
-  };
-
-  const submitNote = () => {
-    if (!noteText.trim()) return;
-    addNote({
-      id: `note-${Date.now()}`,
-      patientFileNo: fileNo,
-      doctorId: doctor.id,
-      authorName: `د. ${doctor.firstName} ${doctor.lastName}`,
-      text: noteText.trim(),
-      createdAt: new Date().toISOString(),
-    });
-    setNoteText("");
-    toast.success(t.common.saved, "تمت إضافة الملاحظة.");
-  };
+  if (isError || !patient) {
+    if (error?.status === 404) {
+      return (
+        <div className="py-10">
+          <EmptyState title="المريض غير موجود" description={`رقم الإضبارة: ${fileNo}`} />
+          <div className="mt-4 text-center">
+            <Button variant="outline" onClick={() => navigate("/patients")}>
+              {t.common.back}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="py-10">
+        <ErrorState message={error?.message} onRetry={() => refetch()} />
+      </div>
+    );
+  }
 
   const ACTIONS = [
     { label: t.patient.actions.requestLab, icon: <FlaskConical />, to: `/patients/${fileNo}/lab-request`, variant: "outline" as const },
@@ -126,7 +98,8 @@ export function PatientRecordScreen() {
     <div>
       <PatientContextBar patient={patient} />
 
-      {/* Primary actions toolbar */}
+      {/* Primary actions toolbar — still route to mock-backed screens (PatientScreenFrame),
+          so they'll show "لم يتم العثور على المريض" for a real patient until each is wired. */}
       <div className="mb-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {ACTIONS.map((a) => (
           <Button key={a.label} variant={a.variant} className="shrink-0" onClick={() => navigate(a.to)}>
@@ -134,13 +107,15 @@ export function PatientRecordScreen() {
             {a.label}
           </Button>
         ))}
-        <DestinationButton
-          current={patient.department}
-          onSet={(d) => {
-            setPatientDestination(fileNo, d);
-            toast.success(t.common.saved, `${t.patient.actions.setDestination}: ${departmentLabel[d]}`);
-          }}
-        />
+        {patient.department && (
+          <DestinationButton
+            current={patient.department}
+            onSet={(d) => {
+              setPatientDestination(fileNo, d);
+              toast.success(t.common.saved, `${t.patient.actions.setDestination}: ${departmentLabel[d]}`);
+            }}
+          />
+        )}
       </div>
 
       <Tabs defaultValue="overview">
@@ -157,7 +132,7 @@ export function PatientRecordScreen() {
           <TabsTrigger value="appointments">{t.patient.appointments}</TabsTrigger>
         </TabsList>
 
-        {/* ── Overview ── */}
+        {/* ── Overview — real data ── */}
         <TabsContent value="overview">
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -166,59 +141,40 @@ export function PatientRecordScreen() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  <Field label={t.common.diagnosis} value={patient.diagnosis} />
-                  <Field label={t.common.phase} value={patient.currentPhase} />
-                  <Field label={t.common.department} value={departmentLabel[patient.department]} />
+                  <Field label={t.common.diagnosis} value={patient.diagnosis ?? "لا يوجد تشخيص بعد"} />
+                  <Field label={t.common.phase} value={patient.currentPhase ?? "لم تُحدد المرحلة"} />
+                  <Field
+                    label={t.common.department}
+                    value={patient.department ? departmentLabel[patient.department] : null}
+                  />
                 </dl>
-                {plan && (
-                  <div>
-                    <p className="mb-2 text-sm font-bold text-muted-foreground">{t.plan.timeline}</p>
-                    <StageTimeline stages={plan.phases} />
-                  </div>
-                )}
               </CardContent>
             </Card>
 
             <div className="space-y-4">
+              {/* TODO(api-contract): wired in a later slice (lab-test-requests) */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">{t.patient.labs}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {labs.slice(0, 2).map((l) => (
-                    <div key={l.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate">{l.testTypes.map(testLabel).join("، ")}</span>
-                      <LabStatusBadge status={l.status} />
-                    </div>
-                  ))}
-                  {labs.length === 0 && <p className="text-sm text-muted-foreground">{t.common.none}</p>}
+                  <p className="text-sm text-muted-foreground">{t.common.none}</p>
                 </CardContent>
               </Card>
+              {/* TODO(api-contract): wired in a later slice (disease-documentation) */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">مسودات مفتوحة</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {docs.filter((d) => d.status === "draft").map((d) => (
-                    <button
-                      key={d.id}
-                      onClick={() => navigate(`/patients/${fileNo}/document`)}
-                      className="flex w-full items-center justify-between gap-2 text-right text-sm hover:text-primary"
-                    >
-                      <span className="truncate">{d.templateName}</span>
-                      <Badge variant="accent">مسودة</Badge>
-                    </button>
-                  ))}
-                  {docs.filter((d) => d.status === "draft").length === 0 && (
-                    <p className="text-sm text-muted-foreground">{t.common.none}</p>
-                  )}
+                  <p className="text-sm text-muted-foreground">{t.common.none}</p>
                 </CardContent>
               </Card>
             </div>
           </div>
         </TabsContent>
 
-        {/* ── Demographics ── */}
+        {/* ── Demographics — real data ── */}
         <TabsContent value="demographics">
           <Card>
             <CardContent className="p-6">
@@ -230,287 +186,265 @@ export function PatientRecordScreen() {
                 <Field label="اسم الأب" value={patient.fatherName} />
                 <Field label="اسم الأم" value={patient.motherName} />
                 <Field label="تاريخ الميلاد" value={formatDate(patient.dob)} />
-                <Field label={t.common.age} value={`${computeAge(patient.dob)} ${t.common.years}`} />
-                <Field label={t.common.gender} value={genderLabel[patient.gender]} />
-                <Field label="الجنسية" value={nationalityLabel[patient.nationality]} />
+                <Field label={t.common.age} value={patient.age != null ? `${patient.age} ${t.common.years}` : null} />
+                <Field label={t.common.gender} value={patient.gender ? genderLabel[patient.gender] : null} />
+                <Field label="الجنسية" value={nationalityLabel[patient.nationality] ?? patient.nationality} />
                 <Field label="الرقم الوطني (المريض)" value={patient.nationalIdPatient} />
                 <Field label="الرقم الوطني (الأب)" value={patient.nationalIdFather} />
-                <Field label="مقدّم الرعاية" value={caregiverLabel[patient.caregiver]} />
-                <Field label="تعليم مقدّم الرعاية" value={caregiverEducationLabel[patient.caregiverEducation]} />
-                <Field label="هاتف الأب" value={patient.phones.father} />
-                <Field label="هاتف الأم" value={patient.phones.mother} />
+                <Field label="مقدّم الرعاية" value={caregiverLabel[patient.caregiver] ?? patient.caregiver} />
+                <Field
+                  label="تعليم مقدّم الرعاية"
+                  value={caregiverEducationLabel[patient.caregiverEducation] ?? patient.caregiverEducation}
+                />
+                <Field label="هاتف الأب" value={patient.phones?.father} />
+                <Field label="هاتف الأم" value={patient.phones?.mother} />
                 <Field
                   label="القيد العائلي"
-                  value={`${patient.familyRegistry.country} - ${patient.familyRegistry.governorate} - ${patient.familyRegistry.city}`}
+                  value={
+                    patient.familyRegistry
+                      ? `${patient.familyRegistry.country} - ${patient.familyRegistry.governorate} - ${patient.familyRegistry.city}`
+                      : null
+                  }
                 />
                 <Field
                   label="مكان الإقامة"
-                  value={`${patient.residence.country} - ${patient.residence.governorate} - ${patient.residence.city}`}
+                  value={
+                    patient.residence
+                      ? `${patient.residence.country} - ${patient.residence.governorate} - ${patient.residence.city}`
+                      : null
+                  }
                 />
-                <Field label="تاريخ الإحالة" value={formatDate(patient.referral.date)} />
-                <Field label="جهة الإحالة" value={patient.referral.center} />
-                <Field label="اختصاص الطبيب المُحيل" value={patient.referral.referringDoctorSpecialty} />
-                <Field label="نمط الإحالة" value={patient.referral.pattern} />
+                <Field label="تاريخ الإحالة" value={patient.referral ? formatDate(patient.referral.date) : null} />
+                <Field label="جهة الإحالة" value={patient.referral?.center} />
+                <Field label="اختصاص الطبيب المُحيل" value={patient.referral?.referringDoctorSpecialty} />
+                <Field label="نمط الإحالة" value={patient.referral?.pattern} />
               </dl>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ── Documentation ── */}
+        {/* ── Documentation — TODO(api-contract): wired in a later slice ── */}
         <TabsContent value="documentation">
-          <div className="mb-3 flex justify-end">
-            <Button onClick={() => navigate(`/patients/${fileNo}/document`)}>
-              <ClipboardEdit className="size-4" /> {t.document.title}
-            </Button>
-          </div>
-          {docs.length === 0 ? (
-            <EmptyState title="لا يوجد توثيق بعد" description="ابدأ بتوثيق المرض عبر قالب." />
-          ) : (
-            <div className="space-y-3">
-              {docs.map((d) => (
-                <Card
-                  key={d.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(`/patients/${fileNo}/document`)}
-                  className="flex cursor-pointer items-center justify-between p-4 hover:border-primary/40"
-                >
-                  <div>
-                    <p className="font-bold">{d.templateName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {t.document.version} {d.version} · {formatDateTime(d.lastModifiedAt)}
-                    </p>
-                  </div>
-                  <Badge variant={d.status === "draft" ? "accent" : "secondary"}>
-                    {d.status === "draft" ? "مسودة" : "مُقدّم"}
-                  </Badge>
-                </Card>
-              ))}
-            </div>
-          )}
+          <EmptyState title="لا يوجد توثيق بعد" description="ابدأ بتوثيق المرض عبر قالب." />
         </TabsContent>
 
-        {/* ── Plan ── */}
+        {/* ── Treatment plan — real data, read-only (authoring is a later slice) ── */}
         <TabsContent value="plan">
-          <div className="mb-3 flex justify-end">
-            <Button onClick={() => navigate(`/patients/${fileNo}/plan`)}>
-              <FilePlus2 className="size-4" /> {plan ? t.common.edit : t.plan.builder}
-            </Button>
-          </div>
-          {!plan ? (
-            <EmptyState title="لا توجد خطة علاج" description="أنشئ خطة علاج متعددة المراحل." />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>{plan.planName}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {formatDate(plan.startDate)} ← {formatDate(plan.estimatedEndDate)}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <StageTimeline stages={plan.phases} />
-                <div className="space-y-3">
-                  {plan.phases.map((s) => (
-                    <div key={s.id} className="rounded-xl border border-border p-4">
-                      <div className="mb-2 flex items-center justify-between">
-                        <p className="font-bold">{s.stageName}</p>
-                        <StageStatusBadge status={s.status} />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(s.startDate)} ← {formatDate(s.endDate)} · {s.cycles} دورات · {s.visits} زيارات
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {s.medications.map((m) => (
-                          <Badge key={m.name} variant="primary">
-                            {m.name} · {m.dose}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <TreatmentPlanTab patientFileNo={fileNo} />
         </TabsContent>
 
-        {/* ── Labs ── */}
+        {/* ── Labs — TODO(api-contract): wired in a later slice ── */}
         <TabsContent value="labs">
-          <div className="mb-3 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => navigate(`/patients/${fileNo}/results`)}>
-              <FileCheck2 className="size-4" /> {t.labs.reviewResults}
-            </Button>
-            <Button onClick={() => navigate(`/patients/${fileNo}/lab-request`)}>
-              <FlaskConical className="size-4" /> {t.labs.request}
-            </Button>
-          </div>
-          {labs.length === 0 ? (
-            <EmptyState title="لا توجد فحوص" />
-          ) : (
-            <div className="space-y-3">
-              {labs.map((l) => (
-                <Card key={l.id} className="p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="font-bold">{l.testTypes.map(testLabel).join("، ")}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {l.labKind === "internal" ? t.labs.internal : t.labs.external} ·{" "}
-                        {priorityLabel[l.priority]} · {formatDate(l.requestDate)}
-                      </p>
-                    </div>
-                    <LabStatusBadge status={l.status} />
-                  </div>
-                  {l.rejectionReason && (
-                    <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-sm text-destructive">
-                      {l.rejectionReason}
-                    </p>
-                  )}
-                </Card>
-              ))}
-            </div>
-          )}
+          <EmptyState title="لا توجد فحوص" />
         </TabsContent>
 
-        {/* ── Consult requests ── */}
+        {/* ── Consult requests — needs real (consultationNeeds); list is
+            TODO(api-contract): wired in a later slice (consult-requests) ── */}
         <TabsContent value="consultRequests">
-          {(patient.consultationNeeds?.length ?? 0) > 0 && (
+          {patient.consultationNeeds && patient.consultationNeeds.length > 0 && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="text-sm font-bold text-muted-foreground">{t.patient.consultationNeeds}:</span>
-              {patient.consultationNeeds!.map((ct) => (
+              {patient.consultationNeeds.map((ct) => (
                 <ConsultTypeBadge key={ct} type={ct} />
               ))}
             </div>
           )}
-          {consults.length === 0 ? (
-            <EmptyState tone="success" title={t.consult.empty} />
-          ) : (
-            <div className="space-y-3">
-              {consults.map((c) => (
-                <Card key={c.id} className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ConsultTypeBadge type={c.consultationType} />
-                        <ConsultStatusBadge status={c.status} />
-                      </div>
-                      {c.notes && <p className="mt-1.5 text-sm text-muted-foreground">{c.notes}</p>}
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t.consult.requestDate}: {formatDate(c.createdAt)}
-                      </p>
-                    </div>
-                    {c.status === "pending" && (
-                      <Button size="sm" onClick={() => setConsultTarget(c)}>
-                        <Check className="size-4" /> {t.consult.coordinate}
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-          <ConfirmDialog
-            open={consultTarget != null}
-            onOpenChange={(open) => !open && setConsultTarget(null)}
-            title={t.consult.coordinate}
-            description={consultTarget ? `${patient.firstName} ${patient.familyName} · ${consultTarget.patientFileNo}` : undefined}
-            confirmLabel={t.consult.coordinate}
-            onConfirm={confirmCoordinate}
-          >
-            {consultTarget && (
-              <div className="rounded-xl bg-muted/60 p-4 text-sm">
-                <p className="flex items-center gap-2 font-bold">
-                  <Stethoscope className="size-4 text-primary" />
-                  {consultTypeLabel[consultTarget.consultationType]}
-                </p>
-                <p className="mt-1 text-muted-foreground">{t.consult.coordinateConfirm}</p>
-              </div>
-            )}
-          </ConfirmDialog>
+          <EmptyState tone="success" title={t.consult.empty} />
         </TabsContent>
 
-        {/* ── Vitals ── */}
+        {/* ── Vitals — TODO(api-contract): wired in a later slice ── */}
         <TabsContent value="vitals">
-          <VitalsTab fileNo={fileNo} />
+          <EmptyState title="لا توجد علامات حيوية مسجّلة" />
         </TabsContent>
 
-        {/* ── Notes ── */}
+        {/* ── Notes — real data, read + create (POST /clinical-notes) ── */}
         <TabsContent value="notes">
-          <Card className="mb-4">
-            <CardContent className="space-y-3 p-4">
-              <Textarea
-                placeholder="أضف ملاحظة سريرية…"
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-              />
-              <div className="flex justify-end">
-                <Button onClick={submitNote} disabled={!noteText.trim()}>
-                  <MessageSquarePlus className="size-4" /> {t.patient.actions.addNote}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          {patientNotes.length === 0 ? (
-            <EmptyState title="لا ملاحظات بعد" />
-          ) : (
-            <div className="space-y-3">
-              {patientNotes.map((n) => (
-                <Card key={n.id} className="p-4">
-                  <p className="text-foreground">{n.text}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {n.authorName} · {formatDateTime(n.createdAt)}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          )}
+          <ClinicalNotesTab patientFileNo={fileNo} />
         </TabsContent>
 
-        {/* ── Discharge ── */}
+        {/* ── Discharge — TODO(api-contract): wired in a later slice ── */}
         <TabsContent value="discharge">
-          <div className="mb-3 flex justify-end">
-            <Button onClick={() => navigate(`/patients/${fileNo}/discharge`)}>
-              <Send className="size-4" /> {t.discharge.new}
-            </Button>
-          </div>
-          {discharges.length === 0 ? (
-            <EmptyState title="لا تقارير تخريج" />
-          ) : (
-            <div className="space-y-3">
-              {discharges.map((d) => (
-                <Card key={d.id} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold">{d.stageRef}</p>
-                    <Badge variant="secondary">{formatDate(d.generatedAt)}</Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{d.doctorInstructions}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t.discharge.nextDestination}: {departmentLabel[d.nextVisitDepartment]}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          )}
+          <EmptyState title="لا تقارير تخريج" />
         </TabsContent>
 
-        {/* ── Appointments ── */}
+        {/* ── Appointments — TODO(api-contract): wired in a later slice ── */}
         <TabsContent value="appointments">
-          {appts.length === 0 ? (
-            <EmptyState title="لا مواعيد" />
-          ) : (
-            <div className="space-y-3">
-              {appts.map((a) => (
-                <Card key={a.id} className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-bold">{formatDateTime(a.dateTime)}</p>
-                    <p className="text-xs text-muted-foreground">{a.assignedStaff}</p>
-                  </div>
-                  <Badge variant="muted">{a.status}</Badge>
-                </Card>
-              ))}
-            </div>
-          )}
+          <EmptyState title="لا مواعيد" />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function ClinicalNotesTab({ patientFileNo }: { patientFileNo: string }) {
+  const toast = useToast();
+  const { data, isLoading, isError, refetch } = useClinicalNotes(patientFileNo);
+  const createNote = useCreateClinicalNote(patientFileNo);
+  const [draft, setDraft] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const handleSave = () => {
+    const body = draft.trim();
+    if (!body || createNote.isPending) return;
+    setCreateError(null);
+    createNote.mutate(body, {
+      onSuccess: () => {
+        toast.success(t.common.saved, t.patient.actions.addNote);
+        setDraft("");
+      },
+      onError: (err) => setCreateError(err.message),
+    });
+  };
+
+  const notes = [...(data?.items ?? [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <Textarea
+            placeholder="اكتب ملاحظة..."
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={createNote.isPending}
+          />
+          {createError && <p className="text-sm text-destructive">{createError}</p>}
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={!draft.trim() || createNote.isPending}>
+              {createNote.isPending ? "جارٍ الحفظ…" : t.patient.actions.addNote}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <ListSkeleton rows={3} />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : notes.length === 0 ? (
+        <EmptyState title="لا توجد ملاحظات" />
+      ) : (
+        <div className="space-y-3">
+          {notes.map((n) => (
+            <Card key={n.id}>
+              <CardContent className="space-y-1.5 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-foreground">{n.authorName}</span>
+                  <span className="text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</span>
+                </div>
+                <p className="whitespace-pre-wrap text-sm text-foreground">{n.body}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PHASE_STATUS_ICON: Record<string, React.ReactNode> = {
+  in_progress: <Loader2 className="size-3.5 animate-spin" />,
+  completed: <Check className="size-3.5" />,
+  pending: <Circle className="size-3.5" />,
+};
+
+const PHASE_STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
+  in_progress: "primary",
+  completed: "secondary",
+  pending: "muted",
+};
+
+function TreatmentPlanTab({ patientFileNo }: { patientFileNo: string }) {
+  const { data: plans, isLoading, isError, refetch } = useTreatmentPlans(patientFileNo);
+
+  if (isLoading) return <ListSkeleton rows={3} />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (!plans || plans.length === 0) {
+    return <EmptyState title="لا توجد خطة علاج" description="أنشئ خطة علاج متعددة المراحل." />;
+  }
+
+  return (
+    <div className="space-y-6">
+      {plans.map((plan) => (
+        <Card key={plan.id}>
+          <CardHeader>
+            <CardTitle>{plan.planName}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Field label={t.plan.startDate} value={formatDate(plan.startDate)} />
+              {plan.estimatedEndDate && <Field label={t.plan.endDate} value={formatDate(plan.estimatedEndDate)} />}
+              {plan.overallDescription && <Field label={t.plan.description} value={plan.overallDescription} />}
+            </dl>
+
+            {plan.phases.length > 0 && (
+              <div className="space-y-3">
+                {plan.phases.map((phase) => (
+                  <Card key={phase.id} className="bg-muted/30">
+                    <CardContent className="space-y-2 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-bold text-foreground">{phase.stageName}</span>
+                        <Badge variant={PHASE_STATUS_VARIANT[phase.status] ?? "outline"}>
+                          {PHASE_STATUS_ICON[phase.status]}
+                          {phaseStatusLabel[phase.status] ?? phase.status}
+                        </Badge>
+                      </div>
+
+                      {(phase.startDate || phase.endDate) && (
+                        <p className="text-xs text-muted-foreground">
+                          {phase.startDate ? formatDate(phase.startDate) : "—"}
+                          {phase.endDate ? ` – ${formatDate(phase.endDate)}` : ""}
+                        </p>
+                      )}
+
+                      {phase.description && <p className="text-sm text-foreground">{phase.description}</p>}
+
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {phase.cycles != null && (
+                          <span>
+                            {t.plan.cycles}: {phase.cycles}
+                          </span>
+                        )}
+                        {phase.visits != null && (
+                          <span>
+                            {t.plan.visits}: {phase.visits}
+                          </span>
+                        )}
+                        {phase.procedures && (
+                          <span>
+                            {t.plan.procedures}: {phase.procedures}
+                          </span>
+                        )}
+                        {phase.milestones && (
+                          <span>
+                            {t.plan.milestones}: {phase.milestones}
+                          </span>
+                        )}
+                      </div>
+
+                      {phase.medications.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs font-bold text-muted-foreground">{t.plan.medications}</p>
+                          <ul className="space-y-0.5">
+                            {phase.medications.map((m, mi) => (
+                              <li key={m.id ?? mi} className="text-sm text-foreground">
+                                {m.name} · {m.dose}
+                                {m.schedule ? ` · ${m.schedule}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -536,27 +470,5 @@ function DestinationButton({
         ))}
       </SelectContent>
     </Select>
-  );
-}
-
-function VitalsTab({ fileNo }: { fileNo: string }) {
-  const vitals = useAppStore((s) => s.vitals).filter((v) => v.patientFileNo === fileNo);
-  if (vitals.length === 0) return <EmptyState title="لا توجد علامات حيوية مسجّلة" />;
-  return (
-    <div className="space-y-3">
-      {vitals.map((v) => (
-        <Card key={v.id} className="p-4">
-          <p className="mb-3 text-xs text-muted-foreground">{formatDateTime(v.recordedAt)}</p>
-          <dl className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            <Field label="الوزن" value={`${v.weight} kg`} />
-            <Field label="الطول" value={`${v.height} cm`} />
-            <Field label="الحرارة" value={`${v.temperature}°`} />
-            <Field label="النبض" value={`${v.pulse}`} />
-            <Field label="الضغط" value={v.bloodPressure} />
-            <Field label="التنفس" value={`${v.respiratoryRate}`} />
-          </dl>
-        </Card>
-      ))}
-    </div>
   );
 }

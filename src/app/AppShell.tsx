@@ -22,9 +22,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/auth.store";
 import { useUnreadCount } from "@/store/selectors";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
 import { departmentLabel, t } from "@/i18n/ar";
+import * as authApi from "@/api/auth.api";
 import { GlobalSearch } from "./GlobalSearch";
 
 const NAV = [
@@ -37,12 +39,14 @@ const NAV = [
 
 export function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false);
-  const { doctor, department, setDepartment, logout } = useAppStore();
+  const { doctor, department, setDepartment } = useAppStore();
+  const clearSession = useAuthStore((s) => s.clearSession);
   const unread = useUnreadCount();
   const navigate = useNavigate();
 
-  const onLogout = () => {
-    logout();
+  const onLogout = async () => {
+    await authApi.logout(); // revokes the token server-side; never throws
+    clearSession();
     navigate("/login");
   };
 

@@ -1,5 +1,4 @@
 import { useAppStore } from "./useAppStore";
-import type { Patient } from "@/mock/types";
 
 export interface DashboardCounts {
   resultsToReview: number;
@@ -47,14 +46,6 @@ export function useDashboardCounts(): DashboardCounts {
     newExternalResults,
     pendingConsults,
   };
-}
-
-/** Patients in the active department (today's queue), ordered by token. */
-export function useDepartmentQueue(): Patient[] {
-  const { patients, department } = useAppStore();
-  return patients
-    .filter((p) => p.department === department)
-    .sort((a, b) => (a.tokenNumber ?? 99) - (b.tokenNumber ?? 99));
 }
 
 export function useUnreadCount(): number {

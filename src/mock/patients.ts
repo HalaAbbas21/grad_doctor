@@ -1,12 +1,18 @@
+import { computeAge } from "@/lib/utils";
 import type { Patient } from "./types";
 
 /**
  * ~14 patients across the three departments with varied life statuses, phases
  * and pending states so every dashboard count and status badge is demonstrable.
  * A typed factory supplies sensible defaults; each patient overrides specifics.
+ *
+ * `age`, `fullName`, and `registrationStatus` are derived below rather than
+ * passed per-patient — they didn't exist before `Patient` was reconciled with
+ * the real API's detail shape, and deriving them here means none of the ~14
+ * patient literals needed touching.
  */
 function makePatient(p: Partial<Patient> & Pick<Patient, "fileNoBasma" | "firstName" | "familyName" | "diagnosis" | "department" | "queueStatus" | "dob">): Patient {
-  return {
+  const merged = {
     fileNoBiruni: "0000/2025",
     electronicFileDate: "2025-01-10",
     basmaFileOpenDate: "2025-01-10",
@@ -40,7 +46,14 @@ function makePatient(p: Partial<Patient> & Pick<Patient, "fileNoBasma" | "firstN
     currentPhase: "مرحلة الحث",
     criticalFlags: [],
     registrationDate: "2025-01-10",
+    registrationStatus: "complete" as const,
     ...p,
+  };
+
+  return {
+    ...merged,
+    fullName: merged.fullName ?? `${merged.firstName} ${merged.familyName}`,
+    age: merged.age ?? (merged.dob ? computeAge(merged.dob) : null),
   } as Patient;
 }
 

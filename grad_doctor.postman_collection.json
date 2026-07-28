@@ -1,0 +1,140 @@
+{
+  "info": {
+    "name": "Basma — grad_doctor (الطبيب)",
+    "description": "Doctor app — bsma_web/grad_doctor\n\nالمسارات: shared + GET /queues (project_grad)\n\nالمراحل القادمة: توثيق · علاج · تحاليل",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://api.basma-unit.cloud:8080/api" },
+    { "key": "authToken", "value": "" },
+    { "key": "patientFileNo", "value": "B-1001" },
+    { "key": "appointmentId", "value": "" },
+    { "key": "doctorId", "value": "" },
+    { "key": "documentationId", "value": "" },
+    { "key": "laboratoryId", "value": "" },
+    { "key": "labRequestId", "value": "" },
+    { "key": "doseApprovalId", "value": "" },
+    { "key": "marItemId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (Doctor)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["if (pm.response.code === 200) { const authToken = pm.response.json().token; pm.collectionVariables.set('authToken', authToken); if (pm.environment.name) { pm.environment.set('authToken', authToken); } }"],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"doctor@basma.org\",\n  \"password\": \"password\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "أنشئ حساب طبيب من grad_admin أولاً إن لم يكن موجوداً"
+          }
+        },
+        { "name": "Me", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/auth/me" } }
+      ]
+    },
+    {
+      "name": "Patients",
+      "item": [
+        { "name": "List Patients", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/patients?perPage=15" } },
+        { "name": "Show Patient", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/patients/{{patientFileNo}}" } }
+      ]
+    },
+    {
+      "name": "Appointments",
+      "item": [
+        { "name": "List Appointments", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/appointments?perPage=15&doctor_id={{doctorId}}" } },
+        { "name": "Complete Appointment", "request": { "method": "PATCH", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/appointments/{{appointmentId}}/complete" } }
+      ]
+    },
+    {
+      "name": "Consult Requests",
+      "item": [
+        { "name": "List Consult Requests", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/consult-requests?perPage=15" } },
+        { "name": "Coordinate Consult Request", "request": { "method": "PATCH", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/consult-requests/1/coordinate" } }
+      ]
+    },
+    {
+      "name": "Medical Templates",
+      "item": [
+        { "name": "List Published Templates", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/medical-templates" } },
+        { "name": "Show Template", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/medical-templates/tpl_all" } }
+      ]
+    },
+    {
+      "name": "Disease Documentation",
+      "item": [
+        { "name": "List Documentations", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/documentations?perPage=15" } },
+        { "name": "Save Draft", "request": { "method": "POST", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"patient_file_no\": \"{{patientFileNo}}\",\n  \"template_code\": \"tpl_all\",\n  \"data\": { \"f_date\": \"2026-01-10\" }\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/documentations" } },
+        { "name": "Submit Documentation", "request": { "method": "PATCH", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/documentations/{{documentationId}}/submit" } }
+      ]
+    },
+    {
+      "name": "Queues",
+      "item": [
+        { "name": "List Queues (Department)", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/queues?department=clinic&perPage=20" } }
+      ]
+    },
+    {
+      "name": "Laboratory",
+      "item": [
+        { "name": "List Laboratories", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/laboratories" } },
+        {
+          "name": "Request Lab Test",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('labRequestId', pm.response.json().id);"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"patient_file_no\": \"{{patientFileNo}}\",\n  \"laboratory_id\": {{laboratoryId}},\n  \"test_types\": [\"CBC\"],\n  \"priority\": \"urgent\",\n  \"clinical_indication\": \"متابعة دورية\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/lab-test-requests"
+          }
+        },
+        { "name": "List Lab Requests", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/lab-test-requests?perPage=15" } },
+        { "name": "List Lab Results", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/lab-results?perPage=15" } },
+        { "name": "Review Lab Request", "request": { "method": "PATCH", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "url": "{{baseUrl}}/lab-test-requests/{{labRequestId}}/review" } }
+      ]
+    },
+    {
+      "name": "Treatment & Dose",
+      "item": [
+        {
+          "name": "Create Treatment Plan",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"patient_file_no\": \"{{patientFileNo}}\",\n  \"plan_name\": \"خطة ALL\",\n  \"start_date\": \"2026-01-01\",\n  \"stages\": [\n    {\n      \"stage_name\": \"مرحلة الحث\",\n      \"start_date\": \"2026-01-01\",\n      \"status\": \"in_progress\",\n      \"medications\": [\n        { \"name\": \"Vincristine\", \"dose\": \"1.5 mg/m²\", \"schedule\": \"أسبوعي\" }\n      ]\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/treatment-plans"
+          }
+        },
+        {
+          "name": "Prepare Dose Approval",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('doseApprovalId', pm.response.json().id);"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"patient_file_no\": \"{{patientFileNo}}\",\n  \"lab_test_request_id\": {{labRequestId}}\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/dose-approvals"
+          }
+        },
+        {
+          "name": "Approve Dose",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().mar_item_id) pm.collectionVariables.set('marItemId', pm.response.json().mar_item_id);"], "type": "text/javascript" } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"approved_dose\": \"Vincristine 1.5 mg/m²\",\n  \"route\": \"IV\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/dose-approvals/{{doseApprovalId}}/approve"
+          }
+        },
+        { "name": "Create Discharge Report", "request": { "method": "POST", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{authToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"patient_file_no\": \"{{patientFileNo}}\",\n  \"stage_ref\": \"مرحلة الصيانة\",\n  \"prescription\": [{ \"med\": \"Paracetamol\", \"dose\": \"250mg\", \"instructions\": \"عند الحاجة\" }],\n  \"doctor_instructions\": \"متابعة بعد أسبوع\",\n  \"next_visit_department\": \"clinic\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/discharge-reports" } }
+      ]
+    }
+  ]
+}

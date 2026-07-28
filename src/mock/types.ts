@@ -54,10 +54,6 @@ export type DocStatus = "draft" | "submitted";
 
 export type StageStatus = "in-progress" | "completed" | "pending"; // قيد التقدم / مكتملة / معلقة
 
-export type AppointmentType = "follow-up" | "initial"; // متابعة / فحص أولي
-
-export type AppointmentStatus = "scheduled" | "checked-in" | "done" | "missed";
-
 export type NotificationType = "alert" | "info" | "reminder"; // تنبيه / معلومة / تذكير
 
 export type ConsultationType = "cardiac" | "neurological" | "ophthalmic" | "ent" | "surgery" | "other";
@@ -72,6 +68,23 @@ export type PatientQueueStatus =
   | "in-treatment" // قيد العلاج
   | "completed" // مكتمل
   | "critical"; // حالة حرجة
+
+// ─── Auth (real backend — src/api/, not mock) ──────────────────────────────
+// The authenticated account from Sanctum login. Separate from `Doctor` below,
+// which is mock profile data every feature screen still renders (§ scope of
+// the auth-only migration).
+
+export interface AuthUser {
+  id: string; // backend sends a number — stringified in the mapper
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  role: string; // 'doctor' | 'admin' | … — kept open, see can() in auth.store.ts
+  status: string; // 'active' | 'inactive' | …
+  permissions: string[]; // deliberately not a closed union — server has undocumented keys
+  lastActivity?: string; // ISO timestamp, verified on /auth/me
+}
 
 // ─── Core entities ──────────────────────────────────────────────────────────
 
@@ -121,42 +134,75 @@ export interface FollowUp {
   deathCountry?: string;
 }
 
+/**
+ * Shared by every still-mock screen AND the real GET /patients/{id} mapper
+ * (see mapPatientDetail in src/api/mappers/patient.mapper.ts) — a superset of
+ * PatientListItem. Real records are often sparse (a patient can be
+ * registered but not yet clinically documented), so every field the API can
+ * actually send back as null/absent is typed that way here, even though
+ * every mock patient in src/mock/patients.ts always supplies a real value.
+ * `age`, `fullName`, and `registrationStatus` don't exist on the old mock
+ * factory output — makePatient() below derives them automatically so none of
+ * the ~14 mock patient literals needed editing.
+ */
 export interface Patient {
   fileNoBasma: string; // PRIMARY identity
-  fileNoBiruni: string; // xxxx/yyyy
+  fileNoBiruni?: string | null; // xxxx/yyyy
   electronicFileDate: string;
   basmaFileOpenDate: string;
-  biruniFileOpenDate: string;
-  nationalIdPatient: string;
-  nationalIdFather: string;
+  biruniFileOpenDate?: string | null;
+  nationalIdPatient?: string | null;
+  nationalIdFather?: string | null;
   firstName: string;
   familyName: string;
-  fatherName: string;
-  motherName: string;
-  dob: string;
-  gender: Gender;
+  fullName: string;
+  fatherName?: string | null;
+  motherName?: string | null;
+  dob: string | null;
+  age: number | null; // computed from dob — see computeAgeFromDob
+  gender: Gender | null;
   nationality: Nationality;
-  familyRegistry: PlaceRef;
-  residence: PlaceRef;
+  familyRegistry?: PlaceRef | null;
+  residence?: PlaceRef | null;
   caregiver: Caregiver;
   caregiverEducation: CaregiverEducation;
-  phones: { father?: string; mother?: string; caregiver?: string; extra?: string };
-  referral: Referral;
-  generalTreatment: GeneralTreatment;
-  followUp: FollowUp;
+  phones?: { father?: string; mother?: string; caregiver?: string; extra?: string } | null;
+  referral?: Referral | null;
+  generalTreatment?: GeneralTreatment | null;
+  followUp?: FollowUp | null;
   lifeStatus: LifeStatus;
-  diagnosis: string;
-  currentPhase: string;
+  diagnosis: string | null;
+  currentPhase: string | null;
   criticalFlags: string[];
-  department: Department;
+  department: Department | null;
   registrationDate: string;
+  registrationStatus: "complete" | "partial"; // TODO(api-contract): confirm the full value set (matches PatientListItem)
   /** Consultation specialties this patient's case has been flagged for. */
   consultationNeeds?: ConsultationType[];
 
-  // Queue/dashboard helpers (mock-only derived state)
-  queueStatus: PatientQueueStatus;
+  // Queue/dashboard helpers (mock-only derived state — no real endpoint yet)
+  queueStatus?: PatientQueueStatus;
   tokenNumber?: number;
   waitingSince?: string; // ISO; used to compute waiting time
+}
+
+// ─── Real backend — patient list slice (src/api/, not mock) ───────────────
+// GET /patients?perPage=15's item shape. Deliberately narrower than `Patient`
+// above (mock, still used by every other still-mock screen) — the list
+// endpoint returns fewer fields than the detail endpoint will.
+
+export interface PatientListItem {
+  fileNoBasma: string;
+  firstName: string;
+  familyName: string;
+  fullName: string;
+  dob: string | null;
+  age: number | null; // computed from dob; null when dob is null
+  gender: "male" | "female" | null;
+  registrationStatus: "complete" | "partial"; // TODO(api-contract): confirm the full value set
+  lifeStatus: string; // keep open — 'alive' seen; others unconfirmed
+  department: Department | null;
+  registrationDate: string;
 }
 
 export interface Vitals {
@@ -272,25 +318,28 @@ export interface ConsultRequest {
 
 // ─── Treatment plan ────────────────────────────────────────────────────────────
 
-export interface Medication {
+export interface PhaseMedication {
+  id?: string;
   name: string;
   dose: string;
-  schedule: string;
+  schedule: string | null;
 }
 
-export interface TreatmentStage {
+export interface TreatmentPhase {
   id: string;
-  planId: string;
   stageName: string;
-  startDate: string;
-  endDate: string;
-  description?: string;
-  medications: Medication[];
-  procedures: string;
-  cycles: number;
-  visits: number;
-  milestones: string;
-  status: StageStatus;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+  procedures: string | null;
+  cycles: number | null;
+  visits: number | null;
+  milestones: string | null;
+  // TODO(api-contract): only "in_progress" has been observed; "completed"/
+  // "pending" are expected but unconfirmed. Kept open so an unseen value
+  // never crashes.
+  status: string;
+  medications: PhaseMedication[];
 }
 
 export interface TreatmentPlan {
@@ -298,10 +347,10 @@ export interface TreatmentPlan {
   patientFileNo: string;
   doctorId: string;
   planName: string;
-  startDate: string;
-  estimatedEndDate: string;
-  overallDescription?: string;
-  phases: TreatmentStage[];
+  startDate: string | null;
+  estimatedEndDate: string | null;
+  overallDescription: string | null;
+  phases: TreatmentPhase[];
 }
 
 // ─── Dose ────────────────────────────────────────────────────────────────────
@@ -363,21 +412,56 @@ export interface DischargeReport {
 export interface Appointment {
   id: string;
   patientFileNo: string;
+  patientName: string;
+  department: Department | null;
   doctorId: string;
-  dateTime: string;
-  type: AppointmentType;
-  status: AppointmentStatus;
-  assignedStaff: string;
-  notes?: string;
+  doctorName: string;
+  /** Full ISO datetime — split into date/time only at render time, not here. */
+  scheduledAt: string;
+  // TODO(api-contract): only "initial_exam" and "follow_up" have been observed.
+  // Kept as an open string (not a union) so an unseen value never crashes —
+  // render sites fall back to showing the raw value for anything unrecognized.
+  type: string;
+  // TODO(api-contract): only "scheduled" and "cancelled" have been observed;
+  // others (e.g. "completed", "no-show") are plausible but unconfirmed. Kept
+  // open for the same reason as `type`.
+  status: string;
+  notes: string | null;
+}
+
+// ─── Queues ─────────────────────────────────────────────────────────────────
+
+export interface QueueItem {
+  id: string;
+  /** Token like "D-12" — a string, not a number; never parse it. */
+  number: string;
+  patientFileNo: string;
+  patientName: string;
+  department: Department | null;
+  queueDate: string;
+  /** Full ISO datetime. */
+  issueTime: string;
+  // TODO(api-contract): only "served" has been observed; "waiting"/"called"
+  // are expected but unconfirmed. Kept open so an unseen value never crashes.
+  status: string;
+  isEmergency: boolean;
+  visibleToGuardian: boolean;
+  pendingData: boolean;
 }
 
 export interface ClinicalNote {
   id: string;
   patientFileNo: string;
-  doctorId: string;
+  authorId: string;
   authorName: string;
-  text: string;
+  body: string;
+  // TODO(api-contract): only "clinical" has been observed; others (e.g.
+  // "administrative") are plausible but unconfirmed. Kept open.
+  kind: string;
   createdAt: string;
+  // TODO(api-contract): not present in the verified create response — don't
+  // assume edit (PATCH) is supported until confirmed.
+  lastEditedAt?: string | null;
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────

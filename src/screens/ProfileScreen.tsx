@@ -14,9 +14,18 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/auth.store";
 import { useToast } from "@/components/ui/toast";
+import * as authApi from "@/api/auth.api";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
-import { departmentLabel, professionalStatusLabel, t } from "@/i18n/ar";
+import { departmentLabel, t } from "@/i18n/ar";
+
+// TODO(api-contract): not provided by /auth/me — backend needs to add syndicate
+// no., specialty, phone. Shown as "—" rather than the old mock doctor's values,
+// which would misrepresent them as this account's real data.
+const NOT_PROVIDED = "—";
+
+const ROLE_LABEL_AR: Record<string, string> = { doctor: "طبيب", admin: "مدير" };
 
 function Row({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
@@ -33,7 +42,9 @@ function Row({ label, value, icon }: { label: string; value: string; icon?: Reac
 export function ProfileScreen() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { doctor, department, setDepartment, logout } = useAppStore();
+  const { department, setDepartment } = useAppStore();
+  const user = useAuthStore((s) => s.user);
+  const clearSession = useAuthStore((s) => s.clearSession);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -42,15 +53,13 @@ export function ProfileScreen() {
       <Card className="mb-5">
         <CardContent className="flex items-center gap-4 p-6">
           <Avatar className="size-16 text-xl">
-            <AvatarFallback>{doctor.firstName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{user?.firstName?.charAt(0) ?? "—"}</AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="text-xl font-bold">
-              د. {doctor.firstName} {doctor.lastName}
-            </h2>
-            <p className="text-sm text-muted-foreground">{doctor.specialization}</p>
+            <h2 className="text-xl font-bold">د. {user?.fullName ?? "—"}</h2>
+            <p className="text-sm text-muted-foreground">{user?.email ?? "—"}</p>
             <Badge variant="primary" className="mt-1.5">
-              {professionalStatusLabel[doctor.professionalStatus]}
+              {(user && ROLE_LABEL_AR[user.role]) ?? user?.role ?? "—"}
             </Badge>
           </div>
         </CardContent>
@@ -61,13 +70,13 @@ export function ProfileScreen() {
           <CardTitle className="text-base">{t.profile.contact}</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <Row label={t.profile.specialization} value={doctor.specialization} />
+          <Row label={t.profile.specialization} value={NOT_PROVIDED} />
           <Separator />
-          <Row label={t.profile.professionalId} value={doctor.professionalId} />
+          <Row label={t.profile.professionalId} value={NOT_PROVIDED} />
           <Separator />
-          <Row label="البريد الإلكتروني" value={doctor.contactEmail} icon={<Mail className="size-4" />} />
+          <Row label="البريد الإلكتروني" value={user?.email ?? "—"} icon={<Mail className="size-4" />} />
           <Separator />
-          <Row label="الهاتف" value={doctor.contactPhone} icon={<Phone className="size-4" />} />
+          <Row label="الهاتف" value={NOT_PROVIDED} icon={<Phone className="size-4" />} />
         </CardContent>
       </Card>
 
@@ -114,8 +123,9 @@ export function ProfileScreen() {
       <Button
         variant="destructive"
         className="w-full"
-        onClick={() => {
-          logout();
+        onClick={async () => {
+          await authApi.logout();
+          clearSession();
           navigate("/login");
         }}
       >

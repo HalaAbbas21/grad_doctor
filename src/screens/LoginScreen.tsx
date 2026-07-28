@@ -1,35 +1,70 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Fingerprint, KeyRound, Loader2, Lock, Stethoscope, User } from "lucide-react";
+import { useLocation, useNavigate, type Location } from "react-router-dom";
+import { Fingerprint, KeyRound, Loader2, Lock, Mail, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/toast";
-import { delay } from "@/lib/utils";
+import * as authApi from "@/api/auth.api";
+import type { ApiError } from "@/api/errors";
+import { ALLOWED_DOCTOR_APP_ROLES, useAuthStore } from "@/store/auth.store";
+import { useAppStore } from "@/store/useAppStore";
 import { t } from "@/i18n/ar";
 
 export function LoginScreen() {
   const navigate = useNavigate();
-  const toast = useToast();
-  const [username, setUsername] = useState("dr.layla");
-  const [password, setPassword] = useState("••••••");
+  const location = useLocation();
+  const setSession = useAuthStore((s) => s.setSession);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
   const lockedOut = attempts >= 3;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (lockedOut) return;
-    if (!username || !password) {
-      setAttempts((a) => a + 1);
-      toast.error("بيانات غير مكتملة", "يرجى إدخال اسم المستخدم وكلمة المرور.");
+    if (lockedOut || loading) return;
+    if (!email || !password) {
+      setError("يرجى إدخال البريد الإلكتروني وكلمة المرور.");
       return;
     }
+
     setLoading(true);
-    await delay(700);
-    setLoading(false);
-    navigate("/select-department");
+    setError(null);
+    try {
+      const { user, token } = await authApi.login(email, password);
+
+      if (!ALLOWED_DOCTOR_APP_ROLES.includes(user.role as (typeof ALLOWED_DOCTOR_APP_ROLES)[number])) {
+        setLoading(false);
+        setAttempts((a) => a + 1);
+        setError(t.login.notDoctorAccount);
+        return;
+      }
+
+      setSession(user, token);
+
+      // A fresh login is a shift-selection moment, clinically: a doctor may
+      // work Clinic in the morning and Inpatient in the afternoon, so it must
+      // never silently reuse a persisted department. This forces
+      // /select-department to appear regardless of what's in localStorage —
+      // only a page *reload* (bootstrap(), not this login flow) may skip it.
+      useAppStore.getState().requireDepartmentSelection();
+      setLoading(false);
+
+      // Still forward a genuine deep-link target (e.g. /patients/B-1042) so
+      // DepartmentSelectScreen can complete that trip after the pick. The
+      // default "/" landing doesn't count as one: since "/" is itself a
+      // protected route, every ordinary unauthenticated visit produces a
+      // `from` of "/" too, and that's not a destination worth restoring.
+      const from = (location.state as { from?: Location } | null)?.from;
+      const isDeepLink = Boolean(from && from.pathname !== "/");
+      navigate("/select-department", { replace: true, state: isDeepLink ? { from } : undefined });
+    } catch (err) {
+      setLoading(false);
+      setAttempts((a) => a + 1);
+      setError((err as ApiError).message ?? "تعذّر تسجيل الدخول.");
+    }
   };
 
   return (
@@ -51,15 +86,16 @@ export function LoginScreen() {
             <h2 className="mb-4 text-lg font-bold">{t.login.title}</h2>
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">{t.login.username}</Label>
+                <Label htmlFor="email">{t.login.email}</Label>
                 <div className="relative">
-                  <User className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Mail className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="pe-10"
-                    autoComplete="username"
+                    autoComplete="email"
                   />
                 </div>
               </div>
@@ -78,10 +114,16 @@ export function LoginScreen() {
                 </div>
               </div>
 
-              {lockedOut && (
+              {lockedOut ? (
                 <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">
                   {t.login.lockout}
                 </p>
+              ) : (
+                error && (
+                  <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">
+                    {error}
+                  </p>
+                )
               )}
 
               <Button type="submit" size="lg" className="w-full" disabled={loading || lockedOut}>
@@ -90,21 +132,11 @@ export function LoginScreen() {
               </Button>
 
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => navigate("/select-department")}
-                >
+                <Button type="button" variant="outline" className="flex-1" disabled>
                   <Fingerprint className="size-5" />
                   {t.login.biometric}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => navigate("/select-department")}
-                >
+                <Button type="button" variant="outline" className="flex-1" disabled>
                   <KeyRound className="size-5" />
                   {t.login.pin}
                 </Button>

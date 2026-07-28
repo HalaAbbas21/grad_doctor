@@ -3,7 +3,7 @@ import { ChevronLeft, Clock, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { QueueStatusBadge } from "./StatusBadge";
-import { computeAge, timeSince } from "@/lib/utils";
+import { timeSince } from "@/lib/utils";
 import { genderLabel, t } from "@/i18n/ar";
 import type { Patient } from "@/mock/types";
 
@@ -35,7 +35,8 @@ export function PatientRow({ patient }: { patient: Patient }) {
             {patient.firstName} {patient.familyName}
           </span>
           <span className="text-xs text-muted-foreground">
-            {computeAge(patient.dob)} {t.common.years} · {genderLabel[patient.gender]}
+            {patient.age != null ? `${patient.age} ${t.common.years}` : "—"} ·{" "}
+            {patient.gender ? genderLabel[patient.gender] : "—"}
           </span>
         </div>
         <p className="mt-1 truncate text-sm text-muted-foreground">
@@ -44,7 +45,7 @@ export function PatientRow({ patient }: { patient: Patient }) {
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <QueueStatusBadge status={patient.queueStatus} />
+        {patient.queueStatus && <QueueStatusBadge status={patient.queueStatus} />}
         {patient.waitingSince && (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="size-3.5" />

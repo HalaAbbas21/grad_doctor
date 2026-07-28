@@ -1,15 +1,20 @@
 import { Check, Circle, Loader2 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { stageStatusLabel } from "@/i18n/ar";
-import type { TreatmentStage } from "@/mock/types";
+import type { StageStatus, TreatmentPhase } from "@/mock/types";
 
-const DOT: Record<TreatmentStage["status"], string> = {
+/** This timeline is only ever fed by the mock authoring flow's closed status set — falls back to the raw value for anything else. */
+function stageLabel(status: string): string {
+  return stageStatusLabel[status as StageStatus] ?? status;
+}
+
+const DOT: Record<string, string> = {
   completed: "bg-secondary text-secondary-foreground border-secondary",
   "in-progress": "bg-primary text-primary-foreground border-primary",
   pending: "bg-muted text-muted-foreground border-border",
 };
 
-const LINE: Record<TreatmentStage["status"], string> = {
+const LINE: Record<string, string> = {
   completed: "bg-secondary",
   "in-progress": "bg-primary",
   pending: "bg-border",
@@ -17,9 +22,12 @@ const LINE: Record<TreatmentStage["status"], string> = {
 
 /**
  * Horizontal RTL stage timeline (§6.4 / §6.9). Flows right→left; status by color + icon + label.
- * On phone it becomes a vertical list to avoid clipping.
+ * On phone it becomes a vertical list to avoid clipping. Built for the mock
+ * authoring flow's closed status set ("completed"/"in-progress"/"pending") —
+ * an unrecognized status still renders (falls through to the neutral Circle
+ * icon and undecorated border), just without a matching color/label.
  */
-export function StageTimeline({ stages }: { stages: TreatmentStage[] }) {
+export function StageTimeline({ stages }: { stages: TreatmentPhase[] }) {
   if (stages.length === 0) {
     return <p className="text-sm text-muted-foreground">لا توجد مراحل بعد.</p>;
   }
@@ -54,7 +62,7 @@ export function StageTimeline({ stages }: { stages: TreatmentStage[] }) {
             </div>
             <div className="mt-2 px-1 text-center">
               <p className="text-sm font-bold text-foreground">{s.stageName}</p>
-              <p className="text-xs text-muted-foreground">{stageStatusLabel[s.status]}</p>
+              <p className="text-xs text-muted-foreground">{stageLabel(s.status)}</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(s.startDate)}</p>
             </div>
           </div>
@@ -82,7 +90,7 @@ export function StageTimeline({ stages }: { stages: TreatmentStage[] }) {
             <div>
               <p className="font-bold text-foreground">{s.stageName}</p>
               <p className="text-xs text-muted-foreground">
-                {stageStatusLabel[s.status]} · {formatDate(s.startDate)}
+                {stageLabel(s.status)} · {formatDate(s.startDate)}
               </p>
             </div>
           </li>

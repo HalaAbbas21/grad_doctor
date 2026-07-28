@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowRight, ChevronDown, Phone, FileText } from "lucide-react";
-import { cn, computeAge } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LifeStatusBadge } from "./StatusBadge";
@@ -15,7 +15,10 @@ import type { Patient } from "@/mock/types";
 export function PatientContextBar({ patient }: { patient: Patient }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const phone = patient.phones.father ?? patient.phones.caregiver ?? patient.phones.mother;
+  const phone = patient.phones?.father ?? patient.phones?.caregiver ?? patient.phones?.mother;
+  // Defense-in-depth: the mapper already normalizes null → [], but never trust
+  // an array-typed API field not to be null/undefined at the point of use.
+  const criticalFlags = patient.criticalFlags ?? [];
 
   return (
     <div className="sticky top-16 z-30 -mx-4 mb-5 border-b border-border bg-card/95 px-4 py-3 backdrop-blur-md md:top-16">
@@ -43,21 +46,23 @@ export function PatientContextBar({ patient }: { patient: Patient }) {
                 {patient.firstName} {patient.familyName}
               </span>
               <span className="text-sm text-muted-foreground">
-                · {computeAge(patient.dob)} {t.common.years} · {genderLabel[patient.gender]}
+                · {patient.age != null ? `${patient.age} ${t.common.years}` : "—"} ·{" "}
+                {patient.gender ? genderLabel[patient.gender] : "—"}
               </span>
               <LifeStatusBadge status={patient.lifeStatus} />
             </div>
             <div className="mt-0.5 hidden truncate text-sm text-muted-foreground sm:block">
-              {patient.diagnosis} · {patient.currentPhase} · {departmentLabel[patient.department]}
+              {patient.diagnosis ?? "—"} · {patient.currentPhase ?? "—"} ·{" "}
+              {patient.department ? departmentLabel[patient.department] : "—"}
             </div>
           </div>
 
           {/* Critical flags */}
-          {patient.criticalFlags.length > 0 && (
+          {criticalFlags.length > 0 && (
             <Badge variant="destructive" className="hidden shrink-0 md:inline-flex">
               <AlertTriangle className="size-3.5" />
-              {patient.criticalFlags[0]}
-              {patient.criticalFlags.length > 1 && ` +${patient.criticalFlags.length - 1}`}
+              {criticalFlags[0]}
+              {criticalFlags.length > 1 && ` +${criticalFlags.length - 1}`}
             </Badge>
           )}
 
@@ -87,14 +92,15 @@ export function PatientContextBar({ patient }: { patient: Patient }) {
       {open && (
         <div className="mt-3 space-y-2 border-t border-border pt-3 text-sm sm:hidden">
           <p className="text-muted-foreground">
-            {patient.diagnosis} · {patient.currentPhase} · {departmentLabel[patient.department]}
+            {patient.diagnosis ?? "—"} · {patient.currentPhase ?? "—"} ·{" "}
+            {patient.department ? departmentLabel[patient.department] : "—"}
           </p>
           <p className="text-muted-foreground">
             {t.common.fileNoBiruni}: <span className="font-mono">{patient.fileNoBiruni}</span>
           </p>
-          {patient.criticalFlags.length > 0 && (
+          {criticalFlags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {patient.criticalFlags.map((f) => (
+              {criticalFlags.map((f) => (
                 <Badge key={f} variant="destructive">
                   <AlertTriangle className="size-3.5" />
                   {f}
