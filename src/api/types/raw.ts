@@ -309,6 +309,36 @@ export interface RawDoctorProfile {
   currentDepartment: string | null;
 }
 
+/**
+ * POST /dose-approvals and PATCH /dose-approvals/{id}/approve — verified
+ * shapes (both confirmed live this session). `id`/`doctor_id`/
+ * `lab_test_request_id`/`treatment_stage_id`/`mar_item_id` are numbers.
+ * `cycle` is a string, not a number. `recommended_dose` comes back as `""`
+ * (empty string) rather than null when there's nothing to recommend —
+ * normalized to null in the mapper, never passed through as "". `route` is
+ * accepted on the approve request but never appears in this response at
+ * all — write-only, intentionally absent here. `mar_item_id` only exists on
+ * the approve response, never on prepare.
+ */
+export interface RawDoseApproval {
+  id: number;
+  patient_file_no: string;
+  doctor_id: number;
+  stage_ref: string | null;
+  treatment_stage_id: number | null;
+  lab_test_request_id: number;
+  cycle: string;
+  last_dose_date: string | null;
+  recommended_dose: string;
+  approved_dose: string | null;
+  adjusted: boolean;
+  adjustment_reason: string | null;
+  notes: string | null;
+  status: string;
+  approved_at: string | null;
+  mar_item_id?: number;
+}
+
 export interface RawPatientDetail extends RawPatientListItem {
   file_no_biruni: string | null;
   electronic_file_date: string;

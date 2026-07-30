@@ -473,14 +473,34 @@ export interface CreateTreatmentPlanPayload {
 export interface DoseApproval {
   id: string;
   patientFileNo: string;
+  doctorId: string;
+  stageRef: string | null;
+  treatmentStageId: string | null;
   labTestRequestId: string; // REQUIRED — the lab-before-dose gate, enforced server-side
-  status: "prepared" | "approved"; // TODO(api-contract): confirm exact values
-  approvedDose?: string; // set at the approve step
-  route?: string; // set at the approve step
-  marItemId?: string; // returned by the approve call
-  createdAt: string;
-  approvedAt?: string;
-  approvedBy?: string;
+  cycle: string; // string, not number — display as-is
+  lastDoseDate: string | null;
+  recommendedDose: string | null; // "" from the API normalized to null
+  approvedDose: string | null; // set at the approve step
+  adjusted: boolean; // true whenever approvedDose !== recommendedDose — including when recommendedDose was empty; don't over-read this as a deliberate override
+  adjustmentReason: string | null;
+  notes: string | null;
+  // TODO(api-contract): "pending"/"approved" observed. Kept open so an
+  // unseen value never crashes.
+  status: string;
+  approvedAt: string | null;
+  marItemId: string | null; // only present after approve, never on prepare
+}
+
+/** POST /dose-approvals write payload. */
+export interface PrepareDoseApprovalPayload {
+  patientFileNo: string;
+  labTestRequestId: string;
+}
+
+/** PATCH /dose-approvals/{id}/approve write payload. `route` is write-only — never echoed back, so it isn't on DoseApproval above. */
+export interface ApproveDosePayload {
+  approvedDose: string;
+  route: string;
 }
 
 /** The nurse's administration item — produced only by an approved DoseApproval. */

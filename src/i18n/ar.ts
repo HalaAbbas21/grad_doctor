@@ -206,7 +206,9 @@ export const t = {
     route: "طريق الإعطاء",
     approvedStatus: "تم الإقرار",
     readyForNurse: "جاهزة للإعطاء من الممرضة",
-    failApprovalToggle: "محاكاة فشل الإقرار",
+    cycle: "الدورة",
+    adjustedFromRecommended: "تم تعديل الجرعة عن الجرعة الموصى بها.",
+    noRecommendation: "لا توجد جرعة موصى بها لهذه الحالة — أدخل الجرعة المعتمدة يدوياً",
   },
 
   vitals: {

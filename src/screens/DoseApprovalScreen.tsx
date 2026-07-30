@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
   Check,
   CheckCircle2,
-  FileText,
   FlaskConical,
   Syringe,
 } from "lucide-react";
@@ -14,17 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { EmptyState } from "@/components/ui/states";
+import { EmptyState, ErrorState, ListSkeleton } from "@/components/ui/states";
 import { PatientScreenFrame } from "@/components/PatientScreenFrame";
 import { Stepper } from "@/components/Stepper";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useAppStore } from "@/store/useAppStore";
+import { useLabRequests, useLabResults } from "@/hooks/useLabs";
+import { usePrepareDoseApproval, useApproveDose } from "@/hooks/useDoseApprovals";
 import { useToast } from "@/components/ui/toast";
-import { cn, delay, formatDate } from "@/lib/utils";
-import { testLabel } from "@/mock";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { t } from "@/i18n/ar";
-import type { Patient } from "@/mock/types";
+import type { DoseApproval, Patient } from "@/mock/types";
 
 export function DoseApprovalScreen() {
   return (
@@ -38,93 +36,98 @@ function DoseInner({ patient }: { patient: Patient }) {
   const fileNo = patient.fileNoBasma;
   const navigate = useNavigate();
   const toast = useToast();
-  const labRequests = useAppStore((s) => s.labRequests);
-  const treatmentPlans = useAppStore((s) => s.treatmentPlans);
-  const doseApprovals = useAppStore((s) => s.doseApprovals);
-  const createDoseApproval = useAppStore((s) => s.createDoseApproval);
-  const approveDoseApproval = useAppStore((s) => s.approveDoseApproval);
-  const simulateApprovalError = useAppStore((s) => s.simulateApprovalError);
-  const setSimulateApprovalError = useAppStore((s) => s.setSimulateApprovalError);
 
-  const plan = treatmentPlans.find((p) => p.patientFileNo === fileNo);
-  const activeStage = plan?.phases.find((s) => s.status === "in-progress") ?? plan?.phases[0];
-  const recommended = activeStage?.medications[0];
+  const {
+    data: labRequests,
+    isLoading: labsLoading,
+    isError: labsError,
+    refetch: refetchLabs,
+  } = useLabRequests(fileNo);
+  const { data: labResults } = useLabResults(fileNo);
 
-  // Step 1 gate: only reviewed lab requests with a result may justify a dose.
-  const eligibleLabs = labRequests.filter(
-    (l) => l.patientFileNo === fileNo && l.reviewed && l.status === "results-available"
-  );
+  const prepareMutation = usePrepareDoseApproval();
+  const approveMutation = useApproveDose();
 
-  const priorApproved = doseApprovals.filter((d) => d.patientFileNo === fileNo && d.status === "approved");
-  const existingPrepared = doseApprovals.find((d) => d.patientFileNo === fileNo && d.status === "prepared");
+  // Structural double-submit guards — checked synchronously, not just via a
+  // disabled attribute that lags a render behind a click.
+  const prepareInFlight = useRef(false);
+  const approveInFlight = useRef(false);
 
-  const [step, setStep] = useState(existingPrepared ? 1 : 0);
-  const [selectedLabId, setSelectedLabId] = useState(existingPrepared?.labTestRequestId ?? "");
-  const [activeDoseApprovalId, setActiveDoseApprovalId] = useState(existingPrepared?.id ?? "");
-  const [preparing, setPreparing] = useState(false);
+  const [step, setStep] = useState<0 | 1>(0);
+  const [selectedLabId, setSelectedLabId] = useState("");
+  const [prepareConfirmOpen, setPrepareConfirmOpen] = useState(false);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [preparedApproval, setPreparedApproval] = useState<DoseApproval | null>(null);
 
-  const [approvedDose, setApprovedDose] = useState(recommended?.dose ?? "");
+  const [approvedDose, setApprovedDose] = useState("");
   const [route, setRoute] = useState("");
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
+  const [finalApproval, setFinalApproval] = useState<DoseApproval | null>(null);
 
-  const activeDoseApproval = doseApprovals.find((d) => d.id === activeDoseApprovalId);
-  const contextLab = labRequests.find((l) => l.id === activeDoseApproval?.labTestRequestId);
+  if (labsLoading) return <ListSkeleton rows={3} />;
+  if (labsError) return <ErrorState onRetry={() => refetchLabs()} />;
 
-  const goToStep2 = async () => {
-    if (!selectedLabId || preparing) return;
-    setPreparing(true);
-    await delay(500); // POST /dose-approvals
-    const record = createDoseApproval(fileNo, selectedLabId);
-    setActiveDoseApprovalId(record.id);
-    setPreparing(false);
-    setStep(1);
+  // Step 1 gate: only reviewed lab requests may justify a dose — no bypass.
+  const eligibleLabs = (labRequests ?? []).filter((l) => l.reviewed);
+  const selectedLab = eligibleLabs.find((l) => l.id === selectedLabId);
+  const resultsFor = (requestId: string) => (labResults ?? []).filter((r) => r.requestId === requestId);
+
+  const openPrepareConfirm = () => {
+    if (!selectedLabId) return;
+    setPrepareError(null);
+    setPrepareConfirmOpen(true);
   };
 
-  const confirmApprove = async () => {
-    if (submitting || !activeDoseApprovalId) return;
-    setSubmitting(true);
-    setApproveError(null);
-    await delay(700); // PATCH /dose-approvals/{id}/approve — no optimistic update before this resolves
-    if (simulateApprovalError) {
-      setSubmitting(false);
-      setConfirmOpen(false);
-      setApproveError("تعذّر إقرار الجرعة. حدث خطأ في الاتصال بالخادم. لم يتم تسجيل أي إقرار — حاول مرة أخرى.");
-      return;
-    }
-    // TODO(api-contract): the approve request only carries approved_dose + route;
-    // medName is inferred here from the treatment plan since the contract doesn't
-    // say how the MAR item's medication name is populated server-side.
-    approveDoseApproval(activeDoseApprovalId, {
-      approvedDose,
-      route,
-      medName: recommended?.name ?? "",
-    });
-    setSubmitting(false);
-    setConfirmOpen(false);
-    toast.success(t.dose.approvedStatus, `${patient.firstName} · ${t.dose.readyForNurse}`);
-    navigate(`/patients/${fileNo}`);
+  const confirmPrepare = () => {
+    if (prepareInFlight.current) return;
+    prepareInFlight.current = true;
+    prepareMutation.mutate(
+      { patientFileNo: fileNo, labTestRequestId: selectedLabId },
+      {
+        onSuccess: (record) => {
+          prepareInFlight.current = false;
+          setPreparedApproval(record);
+          setApprovedDose(record.recommendedDose ?? "");
+          setPrepareConfirmOpen(false);
+          setStep(1);
+        },
+        onError: (err) => {
+          prepareInFlight.current = false;
+          setPrepareConfirmOpen(false);
+          setPrepareError(err.message);
+        },
+      }
+    );
   };
+
+  const confirmApprove = () => {
+    if (approveInFlight.current || !preparedApproval) return;
+    approveInFlight.current = true;
+    approveMutation.mutate(
+      { id: preparedApproval.id, payload: { approvedDose, route } },
+      {
+        onSuccess: (record) => {
+          approveInFlight.current = false;
+          setApproveConfirmOpen(false);
+          setFinalApproval(record);
+          toast.celebrate(t.dose.approvedStatus, `${patient.firstName} · ${t.dose.readyForNurse}`);
+        },
+        onError: (err) => {
+          approveInFlight.current = false;
+          setApproveConfirmOpen(false);
+          setApproveError(err.message);
+        },
+      }
+    );
+  };
+
+  const recommendedDose = preparedApproval?.recommendedDose ?? null;
+  const doseWasAdjusted = recommendedDose != null && approvedDose.trim() !== "" && approvedDose !== recommendedDose;
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <Stepper steps={[t.dose.prepareStep, t.dose.approveStep]} current={step} />
-
-      {priorApproved.length > 0 && (
-        <Card className="border-secondary/40 bg-secondary-soft/40">
-          <CardContent className="space-y-2 p-4">
-            <p className="flex items-center gap-2 text-sm font-bold text-secondary-foreground">
-              <CheckCircle2 className="size-4" /> جرعات مُقرّة سابقاً لهذا المريض
-            </p>
-            {priorApproved.map((d) => (
-              <p key={d.id} className="text-xs text-muted-foreground">
-                {d.approvedDose} · {d.route} · {formatDate(d.approvedAt)} · {t.dose.readyForNurse}
-              </p>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {step === 0 && (
         <>
@@ -136,15 +139,23 @@ function DoseInner({ patient }: { patient: Patient }) {
             </CardHeader>
             <CardContent>
               {eligibleLabs.length === 0 ? (
-                <EmptyState
-                  title={t.dose.noEligibleLab}
-                  description="لا يمكن المتابعة قبل توفّر نتيجة تحليل مُراجَعة لهذا المريض."
-                  icon={<AlertTriangle className="size-7" />}
-                />
+                <>
+                  <EmptyState
+                    title={t.dose.noEligibleLab}
+                    description="لا يمكن المتابعة قبل توفّر نتيجة تحليل مُراجَعة لهذا المريض."
+                    icon={<AlertTriangle className="size-7" />}
+                  />
+                  <div className="mt-4 text-center">
+                    <Button variant="outline" onClick={() => navigate(`/patients/${fileNo}`)}>
+                      <FlaskConical className="size-4" /> {t.patient.labs}
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <div className="space-y-3">
                   {eligibleLabs.map((l) => {
                     const selected = l.id === selectedLabId;
+                    const reqResults = resultsFor(l.id);
                     return (
                       <Card
                         key={l.id}
@@ -158,61 +169,64 @@ function DoseInner({ patient }: { patient: Patient }) {
                           selected && "border-primary ring-2 ring-primary/30"
                         )}
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={cn(
-                                "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
-                                selected ? "border-primary bg-primary" : "border-input"
-                              )}
-                            >
-                              {selected && <Check className="size-3.5 text-primary-foreground" />}
-                            </span>
-                            <div>
-                              <p className="font-bold">{l.testTypes.map(testLabel).join("، ")}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {t.common.date}: {formatDate(l.resultUploadDate)}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/patients/${fileNo}/results`);
-                            }}
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={cn(
+                              "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                              selected ? "border-primary bg-primary" : "border-input"
+                            )}
                           >
-                            <FileText className="size-4" /> {t.labs.pdfView}
-                          </Button>
+                            {selected && <Check className="size-3.5 text-primary-foreground" />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {l.testTypes.map((tt) => (
+                                <Badge key={tt} variant="accent">
+                                  {tt}
+                                </Badge>
+                              ))}
+                            </div>
+                            {reqResults.length > 0 ? (
+                              <div className="mt-2 space-y-1">
+                                {reqResults.map((r) => (
+                                  <p key={r.id} className="text-sm text-muted-foreground">
+                                    {r.summary && <span className="text-foreground">{r.summary}</span>}
+                                    <span className="block text-xs">
+                                      {t.common.date}: {formatDate(r.resultDate)}
+                                    </span>
+                                  </p>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                {t.common.date}: {formatDate(l.requestDate)}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </Card>
                     );
                   })}
                 </div>
               )}
-              {eligibleLabs.length === 0 && (
-                <div className="mt-4 text-center">
-                  <Button variant="outline" onClick={() => navigate(`/patients/${fileNo}/results`)}>
-                    <FlaskConical className="size-4" /> {t.labs.reviewResults}
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          <Button
-            size="lg"
-            className="w-full"
-            disabled={!selectedLabId || preparing}
-            onClick={goToStep2}
-          >
-            {preparing ? t.common.loading : t.common.next}
-          </Button>
+          {prepareError && (
+            <p className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">
+              <AlertTriangle className="size-4 shrink-0" /> {prepareError}
+            </p>
+          )}
+
+          {eligibleLabs.length > 0 && (
+            <Button size="lg" className="w-full" disabled={!selectedLabId} onClick={openPrepareConfirm}>
+              {t.common.next}
+            </Button>
+          )}
         </>
       )}
 
-      {step === 1 && activeDoseApproval && (
+      {step === 1 && preparedApproval && !finalApproval && (
         <>
           <Card>
             <CardHeader className="pb-3">
@@ -220,35 +234,53 @@ function DoseInner({ patient }: { patient: Patient }) {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div>
-                <p className="text-xs text-muted-foreground">{t.dose.protocolStage}</p>
-                <p className="font-bold">{activeStage?.stageName ?? patient.currentPhase}</p>
+                <p className="text-xs text-muted-foreground">{t.common.fileNo}</p>
+                <p className="font-bold">
+                  {patient.firstName} {patient.familyName} · {patient.fileNoBasma}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">{t.dose.preDoseLab}</p>
-                <p className="font-bold">{contextLab ? contextLab.testTypes.map(testLabel).join("، ") : "—"}</p>
+                <p className="font-bold">{selectedLab ? selectedLab.testTypes.join("، ") : "—"}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">{t.common.date}</p>
-                <p className="font-bold">{formatDate(contextLab?.resultUploadDate)}</p>
+                <p className="font-bold">{formatDate(selectedLab?.requestDate)}</p>
               </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{t.dose.cycle}</p>
+                <p className="font-bold">{preparedApproval.cycle}</p>
+              </div>
+              {preparedApproval.stageRef && (
+                <div>
+                  <p className="text-xs text-muted-foreground">{t.dose.protocolStage}</p>
+                  <p className="font-bold">{preparedApproval.stageRef}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {recommended && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{t.dose.recommended}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-xl bg-primary-soft/60 p-4">
-                  <p className="text-lg font-bold text-primary">{recommended.name}</p>
-                  <p className="text-sm text-foreground">
-                    {recommended.dose} · {recommended.schedule}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{t.dose.recommended}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recommendedDose ? (
+                <>
+                  <div className="rounded-xl bg-primary-soft/60 p-4">
+                    <p className="text-lg font-bold text-primary">{recommendedDose}</p>
+                  </div>
+                  {doseWasAdjusted && (
+                    <p className="mt-2 flex items-center gap-2 text-sm font-bold text-warning-foreground">
+                      <AlertTriangle className="size-4 shrink-0" /> {t.dose.adjustedFromRecommended}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">{t.dose.noRecommendation}</p>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="pb-3">
@@ -272,45 +304,67 @@ function DoseInner({ patient }: { patient: Patient }) {
             </p>
           )}
 
-          <div className="flex items-center justify-end gap-2 rounded-lg border border-dashed border-border bg-card/60 px-4 py-2.5">
-            <Label htmlFor="failApproval" className="text-muted-foreground">
-              {t.dose.failApprovalToggle}
-            </Label>
-            <Switch id="failApproval" checked={simulateApprovalError} onCheckedChange={setSimulateApprovalError} />
-          </div>
-
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               size="lg"
               className="flex-1"
-              disabled={!approvedDose.trim() || !route.trim()}
-              onClick={() => setConfirmOpen(true)}
+              disabled={!approvedDose.trim() || !route.trim() || approveMutation.isPending}
+              onClick={() => setApproveConfirmOpen(true)}
             >
               <Syringe className="size-5" /> {t.dose.approveStep}
             </Button>
-            <Button size="lg" variant="outline" onClick={() => setStep(0)}>
+            <Button size="lg" variant="outline" onClick={() => setStep(0)} disabled={approveMutation.isPending}>
               <ArrowRight className="size-5" /> {t.common.back}
             </Button>
           </div>
         </>
       )}
 
+      {finalApproval && (
+        <Card className="border-secondary/40 bg-secondary-soft/40">
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <span className="flex size-16 items-center justify-center rounded-full bg-secondary-soft text-secondary">
+              <CheckCircle2 className="size-9" />
+            </span>
+            <p className="text-xl font-bold">{t.dose.approvedStatus}</p>
+            <p className="text-muted-foreground">
+              {finalApproval.approvedDose} · {formatDateTime(finalApproval.approvedAt)}
+            </p>
+            <Badge variant="secondary" className="text-sm">
+              {t.dose.readyForNurse} {finalApproval.marItemId ? `(MAR #${finalApproval.marItemId})` : ""}
+            </Badge>
+            <Button className="mt-2" onClick={() => navigate(`/patients/${fileNo}`)}>
+              {t.patient.record}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        open={prepareConfirmOpen}
+        onOpenChange={(open) => !open && setPrepareConfirmOpen(false)}
+        title={t.dose.prepareStep}
+        description={selectedLab ? selectedLab.testTypes.join("، ") : undefined}
+        confirmLabel={t.common.next}
+        loading={prepareMutation.isPending}
+        onConfirm={confirmPrepare}
+      />
+
+      <ConfirmDialog
+        open={approveConfirmOpen}
+        onOpenChange={(open) => !open && setApproveConfirmOpen(false)}
         title={t.dose.approveStep}
-        description={`${patient.firstName} ${patient.familyName} · ${patient.fileNoBasma}`}
         confirmLabel={t.dose.approveStep}
-        loading={submitting}
+        loading={approveMutation.isPending}
         onConfirm={confirmApprove}
       >
         <div className="rounded-xl bg-muted/60 p-4 text-sm">
           <p className="flex items-center gap-2 font-bold">
             <Syringe className="size-4 text-primary" />
-            {recommended?.name} · {approvedDose} · {route || "—"}
+            {approvedDose} · {route || "—"}
           </p>
           <Badge variant="muted" className="mt-2">
-            {patient.fileNoBasma}
+            {patient.firstName} {patient.familyName} · {patient.fileNoBasma}
           </Badge>
         </div>
       </ConfirmDialog>

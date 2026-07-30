@@ -1,19 +1,28 @@
+import { DOCTOR_ID } from "./seed";
 import type { DoseApproval, MarItem } from "./types";
 
+// NOTE: never read by any screen — DoseApprovalScreen now calls the real
+// POST /dose-approvals + PATCH /dose-approvals/{id}/approve API instead.
 // One already-approved dose (with its resulting MAR item) so the "ready for
 // nurse" state is demonstrable without needing a live approve action first.
 export const doseApprovals: DoseApproval[] = [
   {
     id: "dose-1",
     patientFileNo: "B-3012",
+    doctorId: DOCTOR_ID,
+    stageRef: null,
+    treatmentStageId: null,
     labTestRequestId: "lab-3",
-    status: "approved",
+    cycle: "1",
+    lastDoseDate: null,
+    recommendedDose: null,
     approvedDose: "1 g/m²",
-    route: "IV",
-    marItemId: "mar-1",
-    createdAt: "2026-06-02T07:00:00",
+    adjusted: false,
+    adjustmentReason: null,
+    notes: null,
+    status: "approved",
     approvedAt: "2026-06-02T07:10:00",
-    approvedBy: "د. ليلى حدّاد",
+    marItemId: "mar-1",
   },
 ];
 

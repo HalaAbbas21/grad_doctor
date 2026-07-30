@@ -172,9 +172,20 @@ export const useAppStore = create<AppState>()(
         const record: DoseApproval = {
           id: `dose-${Date.now()}`,
           patientFileNo,
+          doctorId: seedDoctor.id,
+          stageRef: null,
+          treatmentStageId: null,
           labTestRequestId,
-          status: "prepared",
-          createdAt: new Date().toISOString(),
+          cycle: "1",
+          lastDoseDate: null,
+          recommendedDose: null,
+          approvedDose: null,
+          adjusted: false,
+          adjustmentReason: null,
+          notes: null,
+          status: "pending",
+          approvedAt: null,
+          marItemId: null,
         };
         set((s) => ({ doseApprovals: [record, ...s.doseApprovals] }));
         return record;
@@ -202,10 +213,9 @@ export const useAppStore = create<AppState>()(
                     ...d,
                     status: "approved",
                     approvedDose,
-                    route,
+                    adjusted: d.recommendedDose != null && approvedDose !== d.recommendedDose,
                     marItemId,
                     approvedAt: new Date().toISOString(),
-                    approvedBy: `د. ${s.doctor.firstName} ${s.doctor.lastName}`,
                   }
                 : d
             ),
