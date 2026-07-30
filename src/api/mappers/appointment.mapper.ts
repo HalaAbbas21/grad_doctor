@@ -21,5 +21,9 @@ export function mapAppointment(raw: RawAppointment): Appointment {
     type: raw.type,
     status: raw.status,
     notes: raw.notes,
+    cancelledBy: raw.cancelled_by != null ? String(raw.cancelled_by) : null,
+    cancelledAt: raw.cancelled_at,
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
   };
 }

@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Check,
+  CheckCircle2,
   Circle,
   ClipboardEdit,
   FileCheck2,
   FilePlus2,
+  FileText,
   FlaskConical,
   Loader2,
   MapPinned,
@@ -22,10 +24,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { PatientContextBar } from "@/components/PatientContextBar";
 import { ConsultTypeBadge } from "@/components/consult-type-badge";
+import { ConsultStatusBadge } from "@/components/StatusBadge";
 import { useAppStore } from "@/store/useAppStore";
 import { usePatient } from "@/hooks/usePatient";
 import { useClinicalNotes, useCreateClinicalNote } from "@/hooks/useClinicalNotes";
 import { useTreatmentPlans } from "@/hooks/useTreatmentPlans";
+import { useVitals } from "@/hooks/useVitals";
+import { useConsultRequests } from "@/hooks/useConsultRequests";
+import { useLabRequests, useLabResults } from "@/hooks/useLabs";
+import { useDischargeReports } from "@/hooks/useDischargeReports";
 import { useToast } from "@/components/ui/toast";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
@@ -33,11 +40,14 @@ import {
   caregiverLabel,
   departmentLabel,
   genderLabel,
+  labRequestStatusLabel,
   nationalityLabel,
   phaseStatusLabel,
+  priorityLabel,
   t,
 } from "@/i18n/ar";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
+import type { LabPriority } from "@/mock/types";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -233,13 +243,12 @@ export function PatientRecordScreen() {
           <TreatmentPlanTab patientFileNo={fileNo} />
         </TabsContent>
 
-        {/* ── Labs — TODO(api-contract): wired in a later slice ── */}
+        {/* ── Labs — real data, read-only (requests + results, no write actions/PDF download yet) ── */}
         <TabsContent value="labs">
-          <EmptyState title="لا توجد فحوص" />
+          <LabsTab patientFileNo={fileNo} />
         </TabsContent>
 
-        {/* ── Consult requests — needs real (consultationNeeds); list is
-            TODO(api-contract): wired in a later slice (consult-requests) ── */}
+        {/* ── Consult requests — real data, read-only (coordinate lives on the standalone screen) ── */}
         <TabsContent value="consultRequests">
           {patient.consultationNeeds && patient.consultationNeeds.length > 0 && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -249,12 +258,12 @@ export function PatientRecordScreen() {
               ))}
             </div>
           )}
-          <EmptyState tone="success" title={t.consult.empty} />
+          <ConsultRequestsTab patientFileNo={fileNo} />
         </TabsContent>
 
-        {/* ── Vitals — TODO(api-contract): wired in a later slice ── */}
+        {/* ── Vitals — real data, read-only (nurse's to write) ── */}
         <TabsContent value="vitals">
-          <EmptyState title="لا توجد علامات حيوية مسجّلة" />
+          <VitalsTab patientFileNo={fileNo} />
         </TabsContent>
 
         {/* ── Notes — real data, read + create (POST /clinical-notes) ── */}
@@ -262,9 +271,9 @@ export function PatientRecordScreen() {
           <ClinicalNotesTab patientFileNo={fileNo} />
         </TabsContent>
 
-        {/* ── Discharge — TODO(api-contract): wired in a later slice ── */}
+        {/* ── Discharge reports — real data, read-only (authoring is a later slice) ── */}
         <TabsContent value="discharge">
-          <EmptyState title="لا تقارير تخريج" />
+          <DischargeReportsTab patientFileNo={fileNo} />
         </TabsContent>
 
         {/* ── Appointments — TODO(api-contract): wired in a later slice ── */}
@@ -443,6 +452,285 @@ function TreatmentPlanTab({ patientFileNo }: { patientFileNo: string }) {
               </div>
             )}
           </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function formatMeasurement(value: number | null, unit: string): string {
+  return value == null ? "—" : `${value} ${unit}`;
+}
+
+function formatBloodPressure(systolic: number | null, diastolic: number | null): string {
+  return systolic != null && diastolic != null ? `${systolic}/${diastolic}` : "—";
+}
+
+function VitalsTab({ patientFileNo }: { patientFileNo: string }) {
+  const { data, isLoading, isError, refetch } = useVitals(patientFileNo);
+
+  if (isLoading) return <ListSkeleton rows={3} />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+
+  const readings = [...(data ?? [])].sort(
+    (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+  );
+
+  if (readings.length === 0) {
+    return <EmptyState title={t.vitals.empty} />;
+  }
+
+  const [latest, ...history] = readings;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base">{t.vitals.latest}</CardTitle>
+          <span className="text-xs text-muted-foreground">{formatDateTime(latest.recordedAt)}</span>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Field label={t.vitals.weight} value={formatMeasurement(latest.weight, "كغ")} />
+            <Field label={t.vitals.height} value={formatMeasurement(latest.height, "سم")} />
+            <Field label={t.vitals.temperature} value={formatMeasurement(latest.temperature, "°م")} />
+            <Field label={t.vitals.pulse} value={formatMeasurement(latest.pulse, "نبضة/د")} />
+            <Field
+              label={t.vitals.bloodPressure}
+              value={formatBloodPressure(latest.bloodPressureSystolic, latest.bloodPressureDiastolic)}
+            />
+            <Field label={t.vitals.respiratoryRate} value={formatMeasurement(latest.respiratoryRate, "/د")} />
+            <Field label={t.vitals.oxygenSaturation} value={formatMeasurement(latest.oxygenSaturation, "%")} />
+            <Field label={t.vitals.painScore} value={formatMeasurement(latest.painScore, "/10")} />
+          </dl>
+        </CardContent>
+      </Card>
+
+      {history.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{t.vitals.history}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {history.map((v) => (
+              <div
+                key={v.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-sm"
+              >
+                <span className="font-bold text-muted-foreground">{formatDateTime(v.recordedAt)}</span>
+                <span className="text-muted-foreground">
+                  {formatMeasurement(v.weight, "كغ")} · {formatMeasurement(v.temperature, "°م")} ·{" "}
+                  {formatMeasurement(v.pulse, "نبضة/د")} · {formatBloodPressure(v.bloodPressureSystolic, v.bloodPressureDiastolic)} ·{" "}
+                  {formatMeasurement(v.oxygenSaturation, "%")}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+const LAB_PRIORITY_VARIANT: Record<string, BadgeProps["variant"]> = {
+  routine: "muted",
+  urgent: "warning",
+  emergency: "destructive",
+};
+
+const LAB_REQUEST_STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
+  results_available: "secondary",
+  pending: "warning",
+  accepted: "primary",
+  rejected: "destructive",
+};
+
+function LabsTab({ patientFileNo }: { patientFileNo: string }) {
+  const {
+    data: requests,
+    isLoading: requestsLoading,
+    isError: requestsError,
+    refetch: refetchRequests,
+  } = useLabRequests(patientFileNo);
+  const {
+    data: results,
+    isLoading: resultsLoading,
+    isError: resultsError,
+    refetch: refetchResults,
+  } = useLabResults(patientFileNo);
+
+  if (requestsLoading || resultsLoading) return <ListSkeleton rows={3} />;
+  if (requestsError || resultsError) {
+    return (
+      <ErrorState
+        onRetry={() => {
+          refetchRequests();
+          refetchResults();
+        }}
+      />
+    );
+  }
+  if (!requests || requests.length === 0) return <EmptyState title={t.labs.empty} />;
+
+  const sorted = [...requests].sort((a, b) => b.requestDate.localeCompare(a.requestDate));
+  const resultsFor = (requestId: string) =>
+    (results ?? []).filter((r) => r.requestId === requestId).sort((a, b) => b.version - a.version);
+
+  return (
+    <div className="space-y-3">
+      {sorted.map((req) => {
+        const reqResults = resultsFor(req.id);
+        return (
+          <Card key={req.id} className="p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {req.testTypes.length > 0 ? (
+                    req.testTypes.map((tt) => (
+                      <Badge key={tt} variant="accent">
+                        {tt}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {req.laboratoryName ?? "—"} · {formatDate(req.requestDate)}
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge variant={LAB_PRIORITY_VARIANT[req.priority] ?? "muted"}>
+                    {priorityLabel[req.priority as LabPriority] ?? req.priority}
+                  </Badge>
+                  {req.preDose && <Badge variant="warning">{t.labs.preDose}</Badge>}
+                  {req.reviewed && (
+                    <Badge variant="secondary">
+                      <CheckCircle2 className="size-3.5" /> {t.labs.reviewed}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <Badge variant={LAB_REQUEST_STATUS_VARIANT[req.status] ?? "outline"}>
+                {labRequestStatusLabel[req.status] ?? req.status}
+              </Badge>
+            </div>
+
+            {reqResults.length > 0 && (
+              <div className="mt-3 space-y-2 border-t border-border pt-3">
+                {reqResults.map((res) => (
+                  <div key={res.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      {res.summary && <p className="text-foreground">{res.summary}</p>}
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formatDate(res.resultDate)} · v{res.version}
+                        {res.uploadedByName ? ` · ${res.uploadedByName}` : ""}
+                      </p>
+                    </div>
+                    <Badge variant="muted">
+                      <FileText className="size-3.5" /> {t.labs.pdfAvailable}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function DischargeReportsTab({ patientFileNo }: { patientFileNo: string }) {
+  const { data, isLoading, isError, refetch } = useDischargeReports(patientFileNo);
+
+  if (isLoading) return <ListSkeleton rows={2} />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (!data || data.length === 0) return <EmptyState title="لا توجد تقارير تخريج" />;
+
+  const sorted = [...data].sort((a, b) => b.generatedAt.localeCompare(a.generatedAt));
+
+  return (
+    <div className="space-y-4">
+      {sorted.map((report) => (
+        <Card key={report.id}>
+          <CardHeader>
+            <CardTitle className="text-base">{report.stageRef ?? "—"}</CardTitle>
+            <p className="text-xs text-muted-foreground">{formatDate(report.generatedAt)}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Field
+                label={t.discharge.lastDoseDate}
+                value={report.lastDoseDate ? formatDate(report.lastDoseDate) : null}
+              />
+              <Field
+                label={t.discharge.nextDestination}
+                value={report.nextVisitDepartment ? departmentLabel[report.nextVisitDepartment] : null}
+              />
+            </dl>
+
+            {report.nextDoseDate && (
+              <div className="rounded-xl bg-highlight-soft p-3">
+                <p className="text-xs font-bold text-highlight-foreground">{t.discharge.nextDoseDate}</p>
+                <p className="text-lg font-bold text-highlight-foreground">{formatDate(report.nextDoseDate)}</p>
+              </div>
+            )}
+
+            {report.prescription.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs font-bold text-muted-foreground">{t.discharge.prescription}</p>
+                <ul className="space-y-1.5">
+                  {report.prescription.map((rx, i) => (
+                    <li key={i} className="rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                      <span className="font-bold">{rx.med}</span>
+                      {rx.dose && ` · ${rx.dose}`}
+                      {rx.instructions && (
+                        <span className="block text-xs text-muted-foreground">{rx.instructions}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {report.doctorInstructions && (
+              <div>
+                <p className="mb-1 text-xs font-bold text-muted-foreground">{t.discharge.doctorInstructions}</p>
+                <p className="text-sm text-foreground">{report.doctorInstructions}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ConsultRequestsTab({ patientFileNo }: { patientFileNo: string }) {
+  const { items, isLoading, isError, refetch } = useConsultRequests({ patientFileNo });
+
+  if (isLoading) return <ListSkeleton rows={2} />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (items.length === 0) return <EmptyState tone="success" title={t.consult.empty} />;
+
+  const sorted = [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  return (
+    <div className="space-y-3">
+      {sorted.map((c) => (
+        <Card key={c.id} className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <ConsultTypeBadge type={c.consultationType} />
+              </div>
+              {c.notes && <p className="mt-1.5 text-sm text-muted-foreground">{c.notes}</p>}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t.consult.requestDate}: {formatDate(c.createdAt)}
+              </p>
+            </div>
+            <ConsultStatusBadge status={c.status} />
+          </div>
         </Card>
       ))}
     </div>

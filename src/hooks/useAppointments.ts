@@ -1,8 +1,10 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { listAppointments } from "@/api/appointments.api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { completeAppointment, listAppointments } from "@/api/appointments.api";
 import { damascusDateKey } from "@/lib/utils";
+import type { ApiError } from "@/api/errors";
 import type { Department } from "@/constants/departments";
+import type { Appointment } from "@/mock/types";
 
 /**
  * Wraps GET /appointments. Filters by department (not doctor) client-side as
@@ -38,4 +40,20 @@ export function useAppointments(params: { department?: Department } = {}) {
     isError: query.isError,
     refetch: query.refetch,
   };
+}
+
+/**
+ * Wraps PATCH /appointments/{id}/complete. No optimistic update — invalidates
+ * every appointments query on success (every department variant, and any
+ * future patient-scoped one) so the Home widget refetches and shows the
+ * server-confirmed "completed" status.
+ */
+export function useCompleteAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation<Appointment, ApiError, string>({
+    mutationFn: (id: string) => completeAppointment(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    },
+  });
 }

@@ -83,18 +83,18 @@ export function StageStatusBadge({ status }: { status: StageStatus }) {
   return <Badge variant={STAGE_MAP[status]}>{stageStatusLabel[status]}</Badge>;
 }
 
-const CONSULT_STATUS_MAP: Record<ConsultRequestStatus, { variant: BadgeProps["variant"]; icon: React.ReactNode }> = {
+const CONSULT_STATUS_MAP: Record<string, { variant: BadgeProps["variant"]; icon: React.ReactNode }> = {
   pending: { variant: "warning", icon: <Hourglass /> },
   coordinated: { variant: "secondary", icon: <CheckCircle2 /> },
 };
 
-/** Renders any status the backend returns — falls back to a neutral, muted badge for values outside the known union. */
-export function ConsultStatusBadge({ status }: { status: ConsultRequestStatus }) {
+/** Renders any status the backend returns — falls back to a neutral, muted badge for values outside the known set. */
+export function ConsultStatusBadge({ status }: { status: string }) {
   const m = CONSULT_STATUS_MAP[status] ?? { variant: "muted" as const, icon: null };
   return (
     <Badge variant={m.variant}>
       {m.icon}
-      {consultStatusLabel[status] ?? status}
+      {consultStatusLabel[status as ConsultRequestStatus] ?? status}
     </Badge>
   );
 }

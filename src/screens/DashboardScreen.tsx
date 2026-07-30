@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -21,10 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/ui/states";
 import { CountCard } from "@/components/CountCard";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useToast } from "@/components/ui/toast";
 import { useAppStore } from "@/store/useAppStore";
 import { useDashboardCounts } from "@/store/selectors";
 import { useMockLoad } from "@/hooks/useMockLoad";
-import { useAppointments } from "@/hooks/useAppointments";
+import { useAppointments, useCompleteAppointment } from "@/hooks/useAppointments";
 import { useQueues } from "@/hooks/useQueues";
 import { cn, damascusDateKey, formatDate, formatTime, timeSince } from "@/lib/utils";
 import {
@@ -35,6 +38,7 @@ import {
   queueItemStatusLabel,
   t,
 } from "@/i18n/ar";
+import type { Appointment } from "@/mock/types";
 
 const QUEUE_STATUS_ICON: Record<string, React.ReactNode> = {
   served: <CheckCircle2 className="size-3.5" />,
@@ -48,8 +52,18 @@ const QUEUE_STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
   called: "primary",
 };
 
+const APPOINTMENT_STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
+  scheduled: "muted",
+  confirmed: "muted",
+  completed: "success",
+  cancelled: "destructive",
+};
+
+const APPOINTMENT_DONE_STATUSES = ["completed", "cancelled"];
+
 export function DashboardScreen() {
   const navigate = useNavigate();
+  const toast = useToast();
   const { doctor, department, notifications } = useAppStore();
   const counts = useDashboardCounts();
   const { loading } = useMockLoad([department]);
@@ -59,6 +73,8 @@ export function DashboardScreen() {
     isError: appointmentsError,
     refetch: refetchAppointments,
   } = useAppointments({ department });
+  const completeAppointment = useCompleteAppointment();
+  const [completeTarget, setCompleteTarget] = useState<Appointment | null>(null);
   const {
     items: queueItems,
     isLoading: queueLoading,
@@ -72,6 +88,17 @@ export function DashboardScreen() {
   // TODO(api-contract): confirm a date/today filter param exists server-side.
   const todayQueue = queueItems.filter((q) => q.queueDate === todayKey);
   const recentNotifs = notifications.slice(0, 4);
+
+  const confirmCompleteAppointment = () => {
+    if (!completeTarget) return;
+    completeAppointment.mutate(completeTarget.id, {
+      onSuccess: () => {
+        toast.success(t.dashboard.completeAppointment, completeTarget.patientName);
+        setCompleteTarget(null);
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -258,9 +285,23 @@ export function DashboardScreen() {
                               {appointmentTypeLabel[a.type] ?? a.type}
                             </p>
                           </div>
-                          <Badge variant={cancelled ? "destructive" : "muted"}>
-                            {appointmentStatusLabel[a.status] ?? a.status}
-                          </Badge>
+                          <div className="flex shrink-0 flex-col items-end gap-1.5">
+                            <Badge variant={APPOINTMENT_STATUS_VARIANT[a.status] ?? "muted"}>
+                              {appointmentStatusLabel[a.status] ?? a.status}
+                            </Badge>
+                            {!APPOINTMENT_DONE_STATUSES.includes(a.status) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCompleteTarget(a);
+                                }}
+                              >
+                                <CheckCircle2 className="size-4" /> {t.dashboard.completeAppointment}
+                              </Button>
+                            )}
+                          </div>
                         </li>
                       );
                     })}
@@ -313,6 +354,16 @@ export function DashboardScreen() {
           </section>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={completeTarget != null}
+        onOpenChange={(open) => !open && setCompleteTarget(null)}
+        title={t.dashboard.completeAppointment}
+        description={completeTarget ? `${completeTarget.patientName} · ${completeTarget.patientFileNo}` : undefined}
+        confirmLabel={t.dashboard.completeAppointment}
+        onConfirm={confirmCompleteAppointment}
+        loading={completeAppointment.isPending}
+      />
     </div>
   );
 }

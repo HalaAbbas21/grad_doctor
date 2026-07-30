@@ -114,6 +114,7 @@ export const t = {
     pendingConsults: "طلبات استشارة بانتظار التنسيق",
     todayQueue: "قائمة اليوم",
     todayAppointments: "مواعيد اليوم",
+    completeAppointment: "إتمام الموعد",
     notificationsFeed: "آخر الإشعارات",
     viewAll: "عرض الكل",
     allClear: "لا يوجد ما يتطلب انتباهك الآن ✅",
@@ -169,6 +170,9 @@ export const t = {
     reviewed: "تمت المراجعة",
     notReviewed: "بانتظار المراجعة",
     failDownloadToggle: "محاكاة فشل التنزيل",
+    preDose: "قبل الجرعة",
+    pdfAvailable: "PDF متوفر",
+    empty: "لا توجد تحاليل",
   },
 
   consult: {
@@ -203,6 +207,20 @@ export const t = {
     approvedStatus: "تم الإقرار",
     readyForNurse: "جاهزة للإعطاء من الممرضة",
     failApprovalToggle: "محاكاة فشل الإقرار",
+  },
+
+  vitals: {
+    latest: "أحدث قراءة",
+    history: "السجل",
+    empty: "لا توجد علامات حيوية",
+    weight: "الوزن",
+    height: "الطول",
+    temperature: "الحرارة",
+    pulse: "النبض",
+    bloodPressure: "ضغط الدم",
+    respiratoryRate: "معدل التنفس",
+    oxygenSaturation: "تشبع الأكسجين",
+    painScore: "شدة الألم",
   },
 
   plan: {
@@ -350,9 +368,9 @@ export const stageStatusLabel: Record<StageStatus, string> = {
 };
 
 // TODO(api-contract): only "initial_exam"/"follow_up" (type) and
-// "scheduled"/"cancelled" (status) have been observed. These are partial
-// maps, not exhaustive unions — render sites must fall back to the raw
-// value for anything unrecognized (e.g. `appointmentTypeLabel[a.type] ?? a.type`).
+// "scheduled"/"cancelled"/"completed" (status) have been observed. These are
+// partial maps, not exhaustive unions — render sites must fall back to the
+// raw value for anything unrecognized (e.g. `appointmentTypeLabel[a.type] ?? a.type`).
 export const appointmentTypeLabel: Record<string, string> = {
   initial_exam: "فحص أولي",
   follow_up: "متابعة",
@@ -360,6 +378,8 @@ export const appointmentTypeLabel: Record<string, string> = {
 
 export const appointmentStatusLabel: Record<string, string> = {
   scheduled: "مجدول",
+  confirmed: "مؤكد",
+  completed: "مكتمل",
   cancelled: "ملغى",
 };
 
@@ -379,6 +399,16 @@ export const phaseStatusLabel: Record<string, string> = {
   in_progress: "قيد التنفيذ",
   completed: "مكتملة",
   pending: "قادمة",
+};
+
+// TODO(api-contract): only "results_available" has been observed live;
+// "pending"/"accepted"/"rejected" exist per the README but are unconfirmed.
+// Fall back to the raw value for anything else.
+export const labRequestStatusLabel: Record<string, string> = {
+  results_available: "النتائج متوفرة",
+  pending: "معلّق",
+  accepted: "مقبول",
+  rejected: "مرفوض",
 };
 
 export const notificationTypeLabel: Record<NotificationType, string> = {

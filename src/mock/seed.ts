@@ -4,7 +4,7 @@ import type {
   DischargeReport,
   Doctor,
   DiseaseDocumentation,
-  LabTestRequest,
+  MockLabRequest,
   TreatmentPlan,
   Vitals,
 } from "./types";
@@ -24,16 +24,18 @@ export const doctor: Doctor = {
 };
 
 // ── Vitals (recorded by nurse) ──────────────────────────────────────
+// NOTE: never read by any screen — the patient record's vitals tab now calls
+// the real GET /patients/{fileNo}/vitals API instead.
 export const vitals: Vitals[] = [
-  { id: "v1", patientFileNo: "B-1042", weight: 22, height: 118, temperature: 37.1, pulse: 96, bloodPressure: "100/65", respiratoryRate: 20, recordedAt: "2026-06-02T08:05:00" },
-  { id: "v2", patientFileNo: "B-1042", weight: 21.6, height: 117, temperature: 38.4, pulse: 110, bloodPressure: "98/60", respiratoryRate: 24, recordedAt: "2026-05-20T09:30:00" },
-  { id: "v3", patientFileNo: "B-2031", weight: 27, height: 126, temperature: 36.8, pulse: 88, bloodPressure: "105/68", respiratoryRate: 18, recordedAt: "2026-06-02T07:55:00" },
-  { id: "v4", patientFileNo: "B-3012", weight: 24.5, height: 120, temperature: 37.6, pulse: 102, bloodPressure: "100/62", respiratoryRate: 22, recordedAt: "2026-06-02T07:20:00" },
-  { id: "v5", patientFileNo: "B-2069", weight: 35, height: 140, temperature: 39.1, pulse: 124, bloodPressure: "95/55", respiratoryRate: 26, recordedAt: "2026-06-02T07:45:00" },
+  { id: "v1", patientFileNo: "B-1042", nurseId: "nurse-1", weight: 22, height: 118, temperature: 37.1, pulse: 96, bloodPressureSystolic: 100, bloodPressureDiastolic: 65, respiratoryRate: 20, oxygenSaturation: 98, painScore: null, recordedAt: "2026-06-02T08:05:00" },
+  { id: "v2", patientFileNo: "B-1042", nurseId: "nurse-1", weight: 21.6, height: 117, temperature: 38.4, pulse: 110, bloodPressureSystolic: 98, bloodPressureDiastolic: 60, respiratoryRate: 24, oxygenSaturation: 97, painScore: 3, recordedAt: "2026-05-20T09:30:00" },
+  { id: "v3", patientFileNo: "B-2031", nurseId: "nurse-2", weight: 27, height: 126, temperature: 36.8, pulse: 88, bloodPressureSystolic: 105, bloodPressureDiastolic: 68, respiratoryRate: 18, oxygenSaturation: 99, painScore: null, recordedAt: "2026-06-02T07:55:00" },
+  { id: "v4", patientFileNo: "B-3012", nurseId: "nurse-1", weight: 24.5, height: 120, temperature: 37.6, pulse: 102, bloodPressureSystolic: 100, bloodPressureDiastolic: 62, respiratoryRate: 22, oxygenSaturation: 98, painScore: 2, recordedAt: "2026-06-02T07:20:00" },
+  { id: "v5", patientFileNo: "B-2069", nurseId: "nurse-2", weight: 35, height: 140, temperature: 39.1, pulse: 124, bloodPressureSystolic: 95, bloodPressureDiastolic: 55, respiratoryRate: 26, oxygenSaturation: 95, painScore: 5, recordedAt: "2026-06-02T07:45:00" },
 ];
 
 // ── Lab requests / results ──────────────────────────────────────────
-export const labRequests: LabTestRequest[] = [
+export const labRequests: MockLabRequest[] = [
   {
     id: "lab-1",
     patientFileNo: "B-1042",
@@ -339,7 +341,6 @@ export const dischargeReports: DischargeReport[] = [
     doctorInstructions: "مراجعة فورية عند الحرارة فوق 38°. الالتزام بموعد التوحيد.",
     nextDoseDate: "2025-03-01",
     nextVisitDepartment: "daycare",
-    generatedBy: "د. ليلى حدّاد",
     generatedAt: "2025-02-26T12:00:00",
     exportable: true,
   },

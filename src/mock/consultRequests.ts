@@ -1,6 +1,7 @@
 import type { ConsultRequest } from "./types";
 
-// Reception creates these; the doctor only reads + coordinates (§ consult-requests).
+// NOTE: never read by any screen — consult-requests now calls the real
+// GET/PATCH /consult-requests API instead.
 export const consultRequests: ConsultRequest[] = [
   {
     id: "cr-1",
@@ -8,6 +9,7 @@ export const consultRequests: ConsultRequest[] = [
     consultationType: "cardiac",
     notes: "تقييم وظيفة القلب قبل بدء بروتوكول علاج كيميائي قلبي السمّية.",
     status: "pending",
+    requestedBy: "reception-1",
     createdAt: "2026-06-01T09:15:00",
   },
   {
@@ -16,6 +18,7 @@ export const consultRequests: ConsultRequest[] = [
     consultationType: "surgery",
     notes: "تقييم قبل الاستئصال الجراحي لساركوما يوينغ.",
     status: "pending",
+    requestedBy: "reception-1",
     createdAt: "2026-06-01T11:40:00",
   },
   {
@@ -24,9 +27,8 @@ export const consultRequests: ConsultRequest[] = [
     consultationType: "surgery",
     notes: "استشارة جراحية ما قبل استئصال ورم ويلمز.",
     status: "coordinated",
+    requestedBy: "reception-1",
     createdAt: "2026-05-28T10:00:00",
-    coordinatedAt: "2026-05-29T13:20:00",
-    coordinatedBy: "د. ليلى حدّاد",
   },
   {
     id: "cr-4",
@@ -34,6 +36,7 @@ export const consultRequests: ConsultRequest[] = [
     consultationType: "ophthalmic",
     notes: "استبعاد ارتشاح شبكي مرافق لابيضاض الدم النقوي الحاد.",
     status: "pending",
+    requestedBy: "reception-1",
     createdAt: "2026-06-02T07:55:00",
   },
   {
@@ -42,8 +45,7 @@ export const consultRequests: ConsultRequest[] = [
     consultationType: "ent",
     notes: "تضخم عقد لمفية رقبية يتطلب تقييم أذنية.",
     status: "coordinated",
+    requestedBy: "reception-1",
     createdAt: "2026-05-20T08:30:00",
-    coordinatedAt: "2026-05-21T09:10:00",
-    coordinatedBy: "د. ليلى حدّاد",
   },
 ];

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -15,26 +16,32 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/auth.store";
+import { useDoctorProfile } from "@/hooks/useDoctorProfile";
 import { useToast } from "@/components/ui/toast";
 import * as authApi from "@/api/auth.api";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
 import { departmentLabel, t } from "@/i18n/ar";
 
-// TODO(api-contract): not provided by /auth/me — backend needs to add syndicate
-// no., specialty, phone. Shown as "—" rather than the old mock doctor's values,
-// which would misrepresent them as this account's real data.
-const NOT_PROVIDED = "—";
-
 const ROLE_LABEL_AR: Record<string, string> = { doctor: "طبيب", admin: "مدير" };
 
-function Row({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+function Row({
+  label,
+  value,
+  icon,
+  loading,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  loading?: boolean;
+}) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
       <span className="flex items-center gap-2 text-sm text-muted-foreground">
         {icon}
         {label}
       </span>
-      <span className="font-semibold text-foreground">{value}</span>
+      {loading ? <Skeleton className="h-4 w-24" /> : <span className="font-semibold text-foreground">{value}</span>}
     </div>
   );
 }
@@ -45,6 +52,7 @@ export function ProfileScreen() {
   const { department, setDepartment } = useAppStore();
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const { data: profile, isLoading: profileLoading } = useDoctorProfile();
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -70,13 +78,26 @@ export function ProfileScreen() {
           <CardTitle className="text-base">{t.profile.contact}</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <Row label={t.profile.specialization} value={NOT_PROVIDED} />
+          <Row
+            label={t.profile.specialization}
+            value={profile?.specialization ?? "—"}
+            loading={profileLoading}
+          />
           <Separator />
-          <Row label={t.profile.professionalId} value={NOT_PROVIDED} />
+          <Row
+            label={t.profile.professionalId}
+            value={profile?.professionalId ?? "—"}
+            loading={profileLoading}
+          />
           <Separator />
           <Row label="البريد الإلكتروني" value={user?.email ?? "—"} icon={<Mail className="size-4" />} />
           <Separator />
-          <Row label="الهاتف" value={NOT_PROVIDED} icon={<Phone className="size-4" />} />
+          <Row
+            label="الهاتف"
+            value={profile?.contactPhone ?? "—"}
+            icon={<Phone className="size-4" />}
+            loading={profileLoading}
+          />
         </CardContent>
       </Card>
 

@@ -13,30 +13,36 @@ export const TEST_TYPES: { value: string; label: string }[] = [
   { value: "lp", label: "بزل قطني (LP)" },
 ];
 
+// NOTE: no longer read by any screen — the "طلب فحص" form now calls the real
+// GET /laboratories API instead.
 export const laboratories: Laboratory[] = [
   {
     id: "lab-basma-internal",
     name: "مخبر بسمة الداخلي",
     kind: "internal",
     supportedTests: ["cbc", "lft", "rft", "electrolytes", "crp", "blood-culture"],
+    profileStatus: "completed",
   },
   {
     id: "lab-basma-pathology",
     name: "مخبر التشريح المرضي - بسمة",
     kind: "internal",
     supportedTests: ["bone-marrow", "lp"],
+    profileStatus: "completed",
   },
   {
     id: "lab-biruni-external",
     name: "مخبر البيروني (خارجي)",
     kind: "external",
     supportedTests: ["cbc", "lft", "rft", "bone-marrow", "blood-culture", "lp"],
+    profileStatus: "completed",
   },
   {
     id: "lab-radiology-external",
     name: "مركز الأشعة التخصصي (خارجي)",
     kind: "external",
     supportedTests: ["ct-scan", "mri"],
+    profileStatus: "completed",
   },
 ];
 

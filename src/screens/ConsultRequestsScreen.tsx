@@ -18,30 +18,33 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ConsultTypeBadge } from "@/components/consult-type-badge";
 import { ConsultStatusBadge } from "@/components/StatusBadge";
 import { useAppStore } from "@/store/useAppStore";
+import { useConsultRequests, useCoordinateConsultRequest } from "@/hooks/useConsultRequests";
 import { useToast } from "@/components/ui/toast";
-import { useMockLoad } from "@/hooks/useMockLoad";
 import { formatDate } from "@/lib/utils";
 import { consultTypeLabel, t } from "@/i18n/ar";
-import type { ConsultationType, ConsultRequest, ConsultRequestStatus } from "@/mock/types";
+import type { ConsultationType, ConsultRequest } from "@/mock/types";
 
 export function ConsultRequestsScreen() {
   const navigate = useNavigate();
   const toast = useToast();
   const [params] = useSearchParams();
-  const { patients, consultRequests, department, coordinateConsultRequest } = useAppStore();
-  const { loading, error, reload } = useMockLoad([department]);
+  // NOTE: still the mock patient list — real consult-requests carry only a
+  // patient_file_no, so this lookup only resolves a name when the two
+  // happen to share a file number (they generally won't); the UI already
+  // falls back to just the file-number badge when it doesn't.
+  const patients = useAppStore((s) => s.patients);
+  const { items, isLoading, isError, refetch } = useConsultRequests();
+  const coordinate = useCoordinateConsultRequest();
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ConsultRequestStatus | "all">(
-    params.get("filter") === "all" ? "all" : "pending"
-  );
+  const [statusFilter, setStatusFilter] = useState<string>(params.get("filter") === "all" ? "all" : "pending");
   const [typeFilter, setTypeFilter] = useState<ConsultationType | "all">("all");
   const [target, setTarget] = useState<ConsultRequest | null>(null);
 
   const patientOf = (fileNo: string) => patients.find((p) => p.fileNoBasma === fileNo);
 
   const list = useMemo(() => {
-    let rows = consultRequests.filter((c) => patientOf(c.patientFileNo)?.department === department);
+    let rows = items;
 
     if (statusFilter !== "all") rows = rows.filter((c) => c.status === statusFilter);
     if (typeFilter !== "all") rows = rows.filter((c) => c.consultationType === typeFilter);
@@ -50,15 +53,21 @@ export function ConsultRequestsScreen() {
     if (q) rows = rows.filter((c) => c.patientFileNo.toLowerCase().includes(q));
 
     return [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [consultRequests, patients, department, statusFilter, typeFilter, query]);
+  }, [items, statusFilter, typeFilter, query]);
 
   const confirmCoordinate = () => {
     if (!target) return;
-    coordinateConsultRequest(target.id);
-    const p = patientOf(target.patientFileNo);
-    toast.success(t.consult.coordinated, `${p ? `${p.firstName} ${p.familyName}` : target.patientFileNo} · ${consultTypeLabel[target.consultationType]}`);
-    setTarget(null);
+    coordinate.mutate(target.id, {
+      onSuccess: () => {
+        const p = patientOf(target.patientFileNo);
+        toast.success(
+          t.consult.coordinated,
+          `${p ? `${p.firstName} ${p.familyName}` : target.patientFileNo} · ${consultTypeLabel[target.consultationType]}`
+        );
+        setTarget(null);
+      },
+      onError: (err) => toast.error(err.message),
+    });
   };
 
   return (
@@ -92,7 +101,7 @@ export function ConsultRequestsScreen() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ConsultRequestStatus | "all")}>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40">
               <span className="flex items-center gap-2">
                 <SlidersHorizontal className="size-4 text-muted-foreground" />
@@ -108,10 +117,10 @@ export function ConsultRequestsScreen() {
         </div>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <ListSkeleton rows={4} />
-      ) : error ? (
-        <ErrorState onRetry={reload} />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : list.length === 0 ? (
         <EmptyState tone="success" title={t.consult.empty} />
       ) : (
@@ -165,6 +174,7 @@ export function ConsultRequestsScreen() {
         description={target ? `${patientOf(target.patientFileNo)?.firstName ?? ""} ${patientOf(target.patientFileNo)?.familyName ?? ""} · ${target.patientFileNo}` : undefined}
         confirmLabel={t.consult.coordinate}
         onConfirm={confirmCoordinate}
+        loading={coordinate.isPending}
       >
         {target && (
           <div className="rounded-xl bg-muted/60 p-4 text-sm">

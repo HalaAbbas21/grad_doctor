@@ -1,4 +1,6 @@
 import { useAppStore } from "./useAppStore";
+import { useConsultRequests } from "@/hooks/useConsultRequests";
+import { useLabRequests } from "@/hooks/useLabs";
 
 export interface DashboardCounts {
   resultsToReview: number;
@@ -11,13 +13,19 @@ export interface DashboardCounts {
 
 /** Live dashboard priority-row counts, scoped to the active department. */
 export function useDashboardCounts(): DashboardCounts {
-  const { patients, labRequests, documentations, pendingDischargeFileNos, consultRequests, department } =
-    useAppStore();
+  const { patients, labRequests, documentations, pendingDischargeFileNos, department } = useAppStore();
+  const { items: consultRequests } = useConsultRequests();
+  const { data: realLabRequests } = useLabRequests();
   const inDept = (fileNo: string) =>
     patients.find((p) => p.fileNoBasma === fileNo)?.department === department;
 
-  const resultsToReview = labRequests.filter(
-    (l) => l.status === "results-available" && !l.reviewed && inDept(l.patientFileNo)
+  // Real data (GET /lab-test-requests, unfiltered) — not scoped to
+  // department, same reasoning as pendingConsults below.
+  // TODO(api-contract): confirm "awaiting review" means status ===
+  // "results_available" && reviewed === false — the most literal reading of
+  // "results arrived but the doctor hasn't reviewed them yet".
+  const resultsToReview = (realLabRequests ?? []).filter(
+    (l) => l.status === "results_available" && !l.reviewed
   ).length;
 
   const dosesToApprove = patients.filter(
@@ -34,9 +42,9 @@ export function useDashboardCounts(): DashboardCounts {
     (l) => l.isExternalNew && !l.reviewed && inDept(l.patientFileNo)
   ).length;
 
-  const pendingConsults = consultRequests.filter(
-    (c) => c.status === "pending" && inDept(c.patientFileNo)
-  ).length;
+  // Real data (GET /consult-requests) — not scoped to department, since no
+  // department filter/field relationship for this endpoint is confirmed.
+  const pendingConsults = consultRequests.filter((c) => c.status === "pending").length;
 
   return {
     resultsToReview,

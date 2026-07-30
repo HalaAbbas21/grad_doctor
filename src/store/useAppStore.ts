@@ -27,8 +27,8 @@ import type {
   DiseaseDocumentation,
   Doctor,
   DoseApproval,
-  LabTestRequest,
   MarItem,
+  MockLabRequest,
   Patient,
   TreatmentPlan,
   Vitals,
@@ -49,7 +49,7 @@ interface AppState {
   // Data (mutable copies of mock seed)
   patients: Patient[];
   vitals: Vitals[];
-  labRequests: LabTestRequest[];
+  labRequests: MockLabRequest[];
   documentations: DiseaseDocumentation[];
   treatmentPlans: TreatmentPlan[];
   dischargeReports: DischargeReport[];
@@ -81,7 +81,7 @@ interface AppState {
   setSimulateApprovalError: (v: boolean) => void;
 
   // Actions — clinical writes
-  addLabRequest: (req: LabTestRequest) => void;
+  addLabRequest: (req: MockLabRequest) => void;
   markLabReviewed: (labId: string) => void;
   upsertDocumentation: (doc: DiseaseDocumentation) => void;
   upsertTreatmentPlan: (plan: TreatmentPlan) => void;
@@ -225,16 +225,7 @@ export const useAppStore = create<AppState>()(
 
       coordinateConsultRequest: (id) =>
         set((s) => ({
-          consultRequests: s.consultRequests.map((c) =>
-            c.id === id
-              ? {
-                  ...c,
-                  status: "coordinated",
-                  coordinatedAt: new Date().toISOString(),
-                  coordinatedBy: `د. ${s.doctor.firstName} ${s.doctor.lastName}`,
-                }
-              : c
-          ),
+          consultRequests: s.consultRequests.map((c) => (c.id === id ? { ...c, status: "coordinated" } : c)),
         })),
 
       markNotificationRead: (id) =>

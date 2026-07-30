@@ -19,3 +19,9 @@ export async function listAppointments(params?: { department?: Department; perPa
   });
   return unwrapList(res.data, mapAppointment);
 }
+
+/** PATCH /appointments/{id}/complete — no request body. Moves an appointment to "completed". */
+export async function completeAppointment(id: string) {
+  const res = await apiClient.patch<RawAppointment>(`/appointments/${id}/complete`);
+  return mapAppointment(res.data);
+}

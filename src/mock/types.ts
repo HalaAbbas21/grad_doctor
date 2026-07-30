@@ -86,6 +86,24 @@ export interface AuthUser {
   lastActivity?: string; // ISO timestamp, verified on /auth/me
 }
 
+/**
+ * GET /doctor/profile — a separate, richer profile source than AuthUser
+ * (/auth/me). Not a replacement for AuthUser; ProfileScreen reads both.
+ */
+export interface DoctorProfile {
+  id: string; // already a string on the wire — never re-stringified
+  firstName: string;
+  lastName: string;
+  specialization: string | null;
+  // TODO(api-contract): only "specialist" observed; "resident"/"attending"
+  // are plausible but unconfirmed. Kept open.
+  professionalStatus: string;
+  professionalId: string | null;
+  contactEmail: string;
+  contactPhone: string | null;
+  currentDepartment: Department | null;
+}
+
 // ─── Core entities ──────────────────────────────────────────────────────────
 
 export interface Doctor {
@@ -208,12 +226,16 @@ export interface PatientListItem {
 export interface Vitals {
   id: string;
   patientFileNo: string;
-  weight: number; // kg
-  height: number; // cm
-  temperature: number; // °C
-  pulse: number; // bpm
-  bloodPressure: string; // e.g. "110/70"
-  respiratoryRate: number; // /min
+  nurseId: string;
+  weight: number | null; // kg
+  height: number | null; // cm
+  temperature: number | null; // °C
+  pulse: number | null; // bpm
+  bloodPressureSystolic: number | null;
+  bloodPressureDiastolic: number | null;
+  respiratoryRate: number | null; // /min
+  oxygenSaturation: number | null; // %
+  painScore: number | null; // 0–10
   recordedAt: string;
 }
 
@@ -270,11 +292,24 @@ export interface DiseaseDocumentation {
 export interface Laboratory {
   id: string;
   name: string;
-  kind: LabKind;
+  kind: string;
   supportedTests: string[]; // test types this lab can run
+  // TODO(api-contract): only "pending_lab_completion"/"completed" observed.
+  // Kept open so an unseen value never crashes.
+  profileStatus: string;
 }
 
-export interface LabTestRequest {
+/**
+ * The mock/authoring-flow shape — one row conflating a request and its
+ * result, used only by the still-mock LabsScreen/LabRequestScreen/
+ * ResultsScreen/DoseApprovalScreen. The real API splits this into two
+ * separate resources (GET /lab-test-requests, GET /lab-results) — see
+ * `LabTestRequest`/`LabResult` below, used by the patient record's real
+ * labs tab. Kept as a distinct type rather than force-fit into the real
+ * shape, since merging them would require also rewriting those four
+ * still-mock screens, out of scope here.
+ */
+export interface MockLabRequest {
   id: string;
   patientFileNo: string;
   doctorId: string;
@@ -296,6 +331,55 @@ export interface LabTestRequest {
   isExternalNew?: boolean; // newly arrived external result (dashboard count)
 }
 
+// ─── Labs (real API — GET /lab-test-requests, GET /lab-results) ──────────────
+
+export interface SampleDraw {
+  id: string;
+  status: string;
+  drawnAt: string | null;
+  sampleNotes: string | null;
+}
+
+export interface LabTestRequest {
+  id: string;
+  patientFileNo: string;
+  requestedBy: string;
+  requestedByName: string | null;
+  laboratoryId: string;
+  laboratoryName: string | null;
+  labKind: string;
+  testTypes: string[];
+  priority: string;
+  clinicalIndication: string | null;
+  treatmentStage: string | null;
+  requestDate: string;
+  // TODO(api-contract): "results_available" observed; "pending"/"accepted"/
+  // "rejected" exist per the README but are unconfirmed live. Kept open.
+  status: string;
+  rejectionReason: string | null;
+  preDose: boolean;
+  reviewed: boolean;
+  reviewedAt: string | null;
+  reviewedByDoctorId: string | null;
+  sampleDraw: SampleDraw | null;
+  latestResultVersion: number | null;
+}
+
+export interface LabResult {
+  id: string;
+  requestId: string;
+  patientFileNo: string;
+  laboratoryId: string;
+  testType: string;
+  // TODO(api-contract): wire PDF download via /lab-results/{id}/download — a later slice.
+  resultFilePath: string;
+  resultDate: string;
+  version: number;
+  isRead: boolean;
+  summary: string | null;
+  uploadedByName: string | null;
+}
+
 // ─── Consult requests ───────────────────────────────────────────────────────
 // Reception creates these (POST); the doctor only reads and coordinates them
 // (GET /consult-requests, PATCH /consult-requests/{id}/coordinate) — no
@@ -305,15 +389,14 @@ export interface ConsultRequest {
   id: string;
   patientFileNo: string;
   consultationType: ConsultationType;
-  notes?: string;
-  // TODO(api-contract): only `status=pending` is confirmed from the collection
-  // endpoint; "coordinated" is inferred from the /coordinate action's purpose.
-  // The UI (see ConsultStatusBadge) renders any other value as a neutral
-  // passthrough rather than assuming this union is exhaustive.
-  status: ConsultRequestStatus;
+  notes: string | null;
+  // TODO(api-contract): only "pending"/"coordinated" observed. Kept open
+  // (not the closed ConsultRequestStatus union) so an unseen value never
+  // crashes — the UI (see ConsultStatusBadge) falls back to a neutral badge
+  // showing the raw value.
+  status: string;
+  requestedBy: string;
   createdAt: string;
-  coordinatedAt?: string;
-  coordinatedBy?: string;
 }
 
 // ─── Treatment plan ────────────────────────────────────────────────────────────
@@ -396,13 +479,12 @@ export interface DischargeReport {
   id: string;
   patientFileNo: string;
   doctorId: string;
-  stageRef: string;
-  lastDoseDate?: string;
+  stageRef: string | null;
+  lastDoseDate: string | null;
   prescription: PrescriptionItem[];
-  doctorInstructions: string;
-  nextDoseDate?: string;
-  nextVisitDepartment: Department;
-  generatedBy: string;
+  doctorInstructions: string | null;
+  nextDoseDate: string | null;
+  nextVisitDepartment: Department | null;
   generatedAt: string;
   exportable: boolean;
 }
@@ -422,11 +504,15 @@ export interface Appointment {
   // Kept as an open string (not a union) so an unseen value never crashes —
   // render sites fall back to showing the raw value for anything unrecognized.
   type: string;
-  // TODO(api-contract): only "scheduled" and "cancelled" have been observed;
-  // others (e.g. "completed", "no-show") are plausible but unconfirmed. Kept
+  // TODO(api-contract): observed so far: "scheduled", "cancelled", "completed".
+  // "confirmed" and others (e.g. "no-show") are plausible but unconfirmed. Kept
   // open for the same reason as `type`.
   status: string;
   notes: string | null;
+  cancelledBy?: string | null;
+  cancelledAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ─── Queues ─────────────────────────────────────────────────────────────────
