@@ -3,6 +3,7 @@ import {
   createLabTestRequest,
   listLabRequests,
   listLabResults,
+  reviewLabRequest,
   type CreateLabTestRequestPayload,
 } from "@/api/labs.api";
 import type { ApiError } from "@/api/errors";
@@ -39,6 +40,24 @@ export function useCreateLabTestRequest() {
   const queryClient = useQueryClient();
   return useMutation<LabTestRequest, ApiError, CreateLabTestRequestPayload>({
     mutationFn: (payload) => createLabTestRequest(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["labTestRequests"] });
+    },
+  });
+}
+
+/**
+ * Wraps PATCH /lab-test-requests/{id}/review. No optimistic update —
+ * invalidates the same `labTestRequests` prefix as useCreateLabTestRequest
+ * on success (the patient's labs tab + the Home "awaiting review" count).
+ * The server rejects a request that isn't status === "results_available" yet
+ * (422) — callers must gate the button on that status client-side; this
+ * mutation doesn't re-check it.
+ */
+export function useReviewLabRequest() {
+  const queryClient = useQueryClient();
+  return useMutation<LabTestRequest, ApiError, string>({
+    mutationFn: (id: string) => reviewLabRequest(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["labTestRequests"] });
     },

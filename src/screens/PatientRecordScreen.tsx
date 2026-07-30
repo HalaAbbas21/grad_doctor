@@ -25,13 +25,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { PatientContextBar } from "@/components/PatientContextBar";
 import { ConsultTypeBadge } from "@/components/consult-type-badge";
 import { ConsultStatusBadge } from "@/components/StatusBadge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAppStore } from "@/store/useAppStore";
 import { usePatient } from "@/hooks/usePatient";
 import { useClinicalNotes, useCreateClinicalNote } from "@/hooks/useClinicalNotes";
 import { useTreatmentPlans } from "@/hooks/useTreatmentPlans";
 import { useVitals } from "@/hooks/useVitals";
 import { useConsultRequests } from "@/hooks/useConsultRequests";
-import { useLabRequests, useLabResults } from "@/hooks/useLabs";
+import { useLabRequests, useLabResults, useReviewLabRequest } from "@/hooks/useLabs";
 import { useDischargeReports } from "@/hooks/useDischargeReports";
 import { useToast } from "@/components/ui/toast";
 import { formatDate, formatDateTime } from "@/lib/utils";
@@ -47,7 +48,7 @@ import {
   t,
 } from "@/i18n/ar";
 import { DEPARTMENTS, type Department } from "@/constants/departments";
-import type { LabPriority } from "@/mock/types";
+import type { LabPriority, LabTestRequest } from "@/mock/types";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -546,6 +547,7 @@ const LAB_REQUEST_STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
 };
 
 function LabsTab({ patientFileNo }: { patientFileNo: string }) {
+  const toast = useToast();
   const {
     data: requests,
     isLoading: requestsLoading,
@@ -558,6 +560,9 @@ function LabsTab({ patientFileNo }: { patientFileNo: string }) {
     isError: resultsError,
     refetch: refetchResults,
   } = useLabResults(patientFileNo);
+  const reviewRequest = useReviewLabRequest();
+  const [reviewTarget, setReviewTarget] = useState<LabTestRequest | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   if (requestsLoading || resultsLoading) return <ListSkeleton rows={3} />;
   if (requestsError || resultsError) {
@@ -576,10 +581,34 @@ function LabsTab({ patientFileNo }: { patientFileNo: string }) {
   const resultsFor = (requestId: string) =>
     (results ?? []).filter((r) => r.requestId === requestId).sort((a, b) => b.version - a.version);
 
+  const confirmReview = () => {
+    if (!reviewTarget) return;
+    reviewRequest.mutate(reviewTarget.id, {
+      onSuccess: () => {
+        toast.success(t.labs.reviewed, reviewTarget.testTypes.join("، "));
+        setReviewTarget(null);
+        setReviewError(null);
+      },
+      onError: (err) => {
+        // The button is only ever shown for a request the frontend believes is
+        // eligible (status === "results_available" && !reviewed) — an error
+        // here means the server disagrees (race/stale cache). Refetch so the
+        // row's true state replaces whatever the UI assumed.
+        setReviewTarget(null);
+        setReviewError(err.message);
+        refetchRequests();
+      },
+    });
+  };
+
   return (
     <div className="space-y-3">
+      {reviewError && (
+        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive">{reviewError}</p>
+      )}
       {sorted.map((req) => {
         const reqResults = resultsFor(req.id);
+        const canReview = req.status === "results_available" && !req.reviewed;
         return (
           <Card key={req.id} className="p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -610,9 +639,16 @@ function LabsTab({ patientFileNo }: { patientFileNo: string }) {
                   )}
                 </div>
               </div>
-              <Badge variant={LAB_REQUEST_STATUS_VARIANT[req.status] ?? "outline"}>
-                {labRequestStatusLabel[req.status] ?? req.status}
-              </Badge>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <Badge variant={LAB_REQUEST_STATUS_VARIANT[req.status] ?? "outline"}>
+                  {labRequestStatusLabel[req.status] ?? req.status}
+                </Badge>
+                {canReview && (
+                  <Button size="sm" onClick={() => setReviewTarget(req)}>
+                    <CheckCircle2 className="size-4" /> {t.labs.markReviewed}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {reqResults.length > 0 && (
@@ -636,6 +672,16 @@ function LabsTab({ patientFileNo }: { patientFileNo: string }) {
           </Card>
         );
       })}
+
+      <ConfirmDialog
+        open={reviewTarget != null}
+        onOpenChange={(open) => !open && setReviewTarget(null)}
+        title={t.labs.markReviewed}
+        description={reviewTarget ? reviewTarget.testTypes.join("، ") : undefined}
+        confirmLabel={t.labs.markReviewed}
+        onConfirm={confirmReview}
+        loading={reviewRequest.isPending}
+      />
     </div>
   );
 }

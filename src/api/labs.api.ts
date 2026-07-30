@@ -45,3 +45,15 @@ export async function createLabTestRequest(payload: CreateLabTestRequestPayload)
   });
   return mapLabTestRequest(res.data);
 }
+
+/**
+ * PATCH /lab-test-requests/{id}/review — no request body. Only valid once
+ * status === "results_available"; the server rejects a request that hasn't
+ * resulted yet with a 422 (verified: `{ message, errors: { status: [...] } }`,
+ * a directly displayable Arabic message). The UI must gate on status client-
+ * side too — this call should only ever fire for an eligible request.
+ */
+export async function reviewLabRequest(id: string) {
+  const res = await apiClient.patch<RawLabTestRequest>(`/lab-test-requests/${id}/review`);
+  return mapLabTestRequest(res.data);
+}
