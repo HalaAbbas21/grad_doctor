@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Plus, Save, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PatientScreenFrame } from "@/components/PatientScreenFrame";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StageTimeline } from "@/components/StageTimeline";
-import { useAppStore } from "@/store/useAppStore";
+import { useCreateTreatmentPlan } from "@/hooks/useTreatmentPlans";
 import { useToast } from "@/components/ui/toast";
-import { stageStatusLabel, t } from "@/i18n/ar";
-import type { PhaseMedication, StageStatus, TreatmentPhase, TreatmentPlan } from "@/mock/types";
+import { phaseStatusLabel, t } from "@/i18n/ar";
+import type { CreateTreatmentPlanPayload, PhaseMedication, TreatmentPhase } from "@/mock/types";
 
 export function TreatmentPlanScreen() {
   return (
@@ -49,17 +50,15 @@ function emptyStage(name = ""): TreatmentPhase {
 function PlanInner({ fileNo }: { fileNo: string }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const doctor = useAppStore((s) => s.doctor);
-  const existing = useAppStore((s) => s.treatmentPlans.find((p) => p.patientFileNo === fileNo));
-  const upsert = useAppStore((s) => s.upsertTreatmentPlan);
+  const createPlan = useCreateTreatmentPlan();
 
-  const planId = existing?.id ?? `plan-${Date.now()}`;
-  const [planName, setPlanName] = useState(existing?.planName ?? "");
-  const [startDate, setStartDate] = useState(existing?.startDate ?? "");
-  const [endDate, setEndDate] = useState(existing?.estimatedEndDate ?? "");
-  const [description, setDescription] = useState(existing?.overallDescription ?? "");
-  const [stages, setStages] = useState<TreatmentPhase[]>(existing?.phases ?? []);
+  const [planName, setPlanName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [stages, setStages] = useState<TreatmentPhase[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const updateStage = (id: string, patch: Partial<TreatmentPhase>) =>
     setStages((ss) => ss.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -96,32 +95,41 @@ function PlanInner({ fileNo }: { fileNo: string }) {
     return true;
   };
 
-  const buildPlan = (): TreatmentPlan => ({
-    id: planId,
+  const buildPayload = (): CreateTreatmentPlanPayload => ({
     patientFileNo: fileNo,
-    doctorId: doctor.id,
     planName: planName || "خطة علاج",
     startDate,
-    estimatedEndDate: endDate,
-    overallDescription: description || null,
-    phases: stages,
+    stages: stages.map((s) => ({
+      stageName: s.stageName,
+      startDate: s.startDate ?? "",
+      status: s.status,
+      medications: s.medications
+        .filter((m) => m.name.trim())
+        .map((m) => ({ name: m.name, dose: m.dose, schedule: m.schedule || undefined })),
+    })),
   });
 
-  const saveDraft = () => {
-    upsert(buildPlan());
-    toast.success(t.common.saved, "تم حفظ المسودة.");
-  };
-
-  const saveFinal = () => {
+  const openConfirm = () => {
     if (!validateChrono()) {
       setError(t.plan.chronoError);
-      toast.error(t.plan.chronoError);
       return;
     }
     setError(null);
-    upsert(buildPlan());
-    toast.celebrate(t.common.saved, "تم حفظ خطة العلاج.");
-    navigate(`/patients/${fileNo}`);
+    setConfirmOpen(true);
+  };
+
+  const submit = () => {
+    createPlan.mutate(buildPayload(), {
+      onSuccess: () => {
+        toast.celebrate(t.common.saved, "تم إنشاء خطة العلاج.");
+        setConfirmOpen(false);
+        navigate(`/patients/${fileNo}`);
+      },
+      onError: (err) => {
+        setConfirmOpen(false);
+        setError(err.message);
+      },
+    });
   };
 
   return (
@@ -247,14 +255,14 @@ function PlanInner({ fileNo }: { fileNo: string }) {
 
               <div className="space-y-2">
                 <Label>{t.common.status}</Label>
-                <Select value={s.status} onValueChange={(v) => updateStage(s.id, { status: v as StageStatus })}>
+                <Select value={s.status} onValueChange={(v) => updateStage(s.id, { status: v })}>
                   <SelectTrigger className="w-48">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(stageStatusLabel) as StageStatus[]).map((st) => (
+                    {Object.keys(phaseStatusLabel).map((st) => (
                       <SelectItem key={st} value={st}>
-                        {stageStatusLabel[st]}
+                        {phaseStatusLabel[st]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -274,10 +282,7 @@ function PlanInner({ fileNo }: { fileNo: string }) {
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <Button variant="secondary" onClick={saveDraft}>
-          <Save className="size-4" /> {t.common.saveDraft}
-        </Button>
-        <Button onClick={saveFinal} disabled={stages.length === 0}>
+        <Button onClick={openConfirm} disabled={stages.length === 0}>
           <Check className="size-4" /> {t.common.save}
         </Button>
       </div>
@@ -287,6 +292,16 @@ function PlanInner({ fileNo }: { fileNo: string }) {
           أضف مرحلة واحدة على الأقل للحفظ
         </Badge>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => !open && setConfirmOpen(false)}
+        title={t.plan.builder}
+        description={`${planName || "خطة علاج"} · ${stages.length} ${t.plan.stages}`}
+        confirmLabel={t.common.save}
+        onConfirm={submit}
+        loading={createPlan.isPending}
+      />
     </div>
   );
 }

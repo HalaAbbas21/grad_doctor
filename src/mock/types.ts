@@ -436,6 +436,34 @@ export interface TreatmentPlan {
   phases: TreatmentPhase[];
 }
 
+/**
+ * POST /treatment-plans write payload — deliberately separate from the read
+ * types above, not a reuse of TreatmentPhase/PhaseMedication. Narrower shape
+ * (no id/plan_id/endDate/description/procedures/visits/milestones — the
+ * backend assigns/defaults those on create) and a real, confirmed naming
+ * asymmetry: the request calls the phase array `stages`, while the response
+ * (and TreatmentPlan.phases above) calls the same thing `phases`. Both spellings are intentional, not a typo.
+ */
+export interface CreatePhaseMedicationPayload {
+  name: string;
+  dose: string;
+  schedule?: string;
+}
+
+export interface CreateTreatmentStagePayload {
+  stageName: string;
+  startDate: string; // plain date ("YYYY-MM-DD"), not a full ISO datetime
+  status: string;
+  medications: CreatePhaseMedicationPayload[];
+}
+
+export interface CreateTreatmentPlanPayload {
+  patientFileNo: string;
+  planName: string;
+  startDate: string; // plain date ("YYYY-MM-DD"), not a full ISO datetime
+  stages: CreateTreatmentStagePayload[];
+}
+
 // ─── Dose ────────────────────────────────────────────────────────────────────
 // Two-step model matching the backend (POST /dose-approvals, then PATCH
 // .../{id}/approve): a dose approval cannot exist without the lab request

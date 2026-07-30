@@ -1,30 +1,30 @@
 import { Check, Circle, Loader2 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
-import { stageStatusLabel } from "@/i18n/ar";
-import type { StageStatus, TreatmentPhase } from "@/mock/types";
+import { phaseStatusLabel } from "@/i18n/ar";
+import type { TreatmentPhase } from "@/mock/types";
 
-/** This timeline is only ever fed by the mock authoring flow's closed status set — falls back to the raw value for anything else. */
+/** Falls back to the raw value for a status outside the observed set — see the TODO(api-contract) on TreatmentPhase.status. */
 function stageLabel(status: string): string {
-  return stageStatusLabel[status as StageStatus] ?? status;
+  return phaseStatusLabel[status] ?? status;
 }
 
 const DOT: Record<string, string> = {
   completed: "bg-secondary text-secondary-foreground border-secondary",
-  "in-progress": "bg-primary text-primary-foreground border-primary",
+  in_progress: "bg-primary text-primary-foreground border-primary",
   pending: "bg-muted text-muted-foreground border-border",
 };
 
 const LINE: Record<string, string> = {
   completed: "bg-secondary",
-  "in-progress": "bg-primary",
+  in_progress: "bg-primary",
   pending: "bg-border",
 };
 
 /**
  * Horizontal RTL stage timeline (§6.4 / §6.9). Flows right→left; status by color + icon + label.
- * On phone it becomes a vertical list to avoid clipping. Built for the mock
- * authoring flow's closed status set ("completed"/"in-progress"/"pending") —
- * an unrecognized status still renders (falls through to the neutral Circle
+ * On phone it becomes a vertical list to avoid clipping. Keyed to the real
+ * API's status spelling ("completed"/"in_progress"/"pending") — an
+ * unrecognized status still renders (falls through to the neutral Circle
  * icon and undecorated border), just without a matching color/label.
  */
 export function StageTimeline({ stages }: { stages: TreatmentPhase[] }) {
@@ -47,7 +47,7 @@ export function StageTimeline({ stages }: { stages: TreatmentPhase[] }) {
               >
                 {s.status === "completed" ? (
                   <Check />
-                ) : s.status === "in-progress" ? (
+                ) : s.status === "in_progress" ? (
                   <Loader2 className="animate-spin" />
                 ) : (
                   <Circle />
@@ -81,7 +81,7 @@ export function StageTimeline({ stages }: { stages: TreatmentPhase[] }) {
             >
               {s.status === "completed" ? (
                 <Check />
-              ) : s.status === "in-progress" ? (
+              ) : s.status === "in_progress" ? (
                 <Loader2 className="animate-spin" />
               ) : (
                 <Circle />
